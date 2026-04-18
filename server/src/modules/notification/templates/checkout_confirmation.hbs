@@ -1,0 +1,13 @@
+<h1>LIBERO Checkout Confirmation</h1>
+<p>Hello {{fullName}},</p>
+<p>Your checkout has been recorded successfully.</p>
+<ul>
+  {{#each loans}}
+  <li>
+    <strong>{{title}}</strong><br />
+    Barcode: {{barcode}}<br />
+    Due date: {{dueDate}}
+  </li>
+  {{/each}}
+</ul>
+<p>You can review your loans here: <a href="{{renewLink}}">{{renewLink}}</a></p>

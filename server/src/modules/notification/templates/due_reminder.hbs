@@ -1,0 +1,12 @@
+<h1>LIBERO Due Reminder</h1>
+<p>Hello {{fullName}},</p>
+<p>The following loan(s) are due soon:</p>
+<ul>
+  {{#each books}}
+  <li>
+    <strong>{{title}}</strong><br />
+    Due date: {{dueDate}}<br />
+    Renew link: <a href="{{renewLink}}">{{renewLink}}</a>
+  </li>
+  {{/each}}
+</ul>

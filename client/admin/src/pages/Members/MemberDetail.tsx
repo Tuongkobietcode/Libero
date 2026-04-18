@@ -1,0 +1,142 @@
+import { useQuery } from '@tanstack/react-query';
+import { Alert, Card, Col, Descriptions, Empty, Row, Space, Table, Typography } from 'antd';
+import { useNavigate, useParams } from 'react-router-dom';
+
+import { StatusBadge } from '../../components/StatusBadge';
+import { fineApi } from '../../services/fine.api';
+import { loanApi } from '../../services/loan.api';
+import { memberApi } from '../../services/member.api';
+import { reservationApi } from '../../services/reservation.api';
+import { getRoleLabel } from '../../utils/display';
+import { formatCurrency, formatDate, formatDateTime } from '../../utils/format';
+
+export default function MemberDetailPage() {
+  const { id = '' } = useParams();
+  const navigate = useNavigate();
+  const memberQuery = useQuery({
+    queryKey: ['members', 'detail', id],
+    enabled: Boolean(id),
+    queryFn: () => memberApi.getMember(id),
+  });
+  const loansQuery = useQuery({
+    queryKey: ['members', 'detail', id, 'loans'],
+    enabled: Boolean(id),
+    queryFn: () => loanApi.listLoans({ memberId: id, limit: 5, page: 1 }),
+  });
+  const reservationsQuery = useQuery({
+    queryKey: ['members', 'detail', id, 'reservations'],
+    enabled: Boolean(id),
+    queryFn: () => reservationApi.listReservations({ memberId: id, limit: 5, page: 1 }),
+  });
+  const finesQuery = useQuery({
+    queryKey: ['members', 'detail', id, 'fines'],
+    enabled: Boolean(id),
+    queryFn: () => fineApi.listFines({ memberId: id, limit: 5, page: 1 }),
+  });
+
+  const member = memberQuery.data;
+  const error = memberQuery.error ?? loansQuery.error ?? reservationsQuery.error ?? finesQuery.error;
+
+  return (
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <Typography.Title level={2} style={{ marginBottom: 0 }}>
+            {member?.fullName ?? 'Chi tiết thành viên'}
+          </Typography.Title>
+          <Typography.Text type="secondary">Theo dõi tài khoản, phiếu mượn, đặt chỗ và tiền phạt của thành viên.</Typography.Text>
+        </div>
+        {member ? (
+          <Space>
+            <Typography.Link onClick={() => navigate(`/members/${member._id}/edit`)}>Chỉnh sửa thành viên</Typography.Link>
+          </Space>
+        ) : null}
+      </Space>
+
+      {error ? (
+        <Alert type="error" showIcon message="Không thể tải chi tiết thành viên" description={(error as Error).message} />
+      ) : null}
+
+      {member ? (
+        <>
+          <Card title="Hồ sơ">
+            <Descriptions bordered column={2}>
+              <Descriptions.Item label="Email">{member.email}</Descriptions.Item>
+              <Descriptions.Item label="Mã thẻ">{member.memberCardNo}</Descriptions.Item>
+              <Descriptions.Item label="Vai trò">{getRoleLabel(member.role)}</Descriptions.Item>
+              <Descriptions.Item label="Trạng thái">
+                <StatusBadge status={member.status} />
+              </Descriptions.Item>
+              <Descriptions.Item label="Bị khóa">{member.isBlocked ? 'Có' : 'Không'}</Descriptions.Item>
+              <Descriptions.Item label="Số điện thoại">{member.phone ?? '-'}</Descriptions.Item>
+              <Descriptions.Item label="Ngày tham gia">{formatDate(member.joinDate)}</Descriptions.Item>
+              <Descriptions.Item label="Ngày hết hạn">{formatDate(member.expiryDate)}</Descriptions.Item>
+            </Descriptions>
+          </Card>
+
+          <Row gutter={[16, 16]}>
+            <Col xs={24} xl={12}>
+              <Card title="Phiếu mượn gần đây">
+                {loansQuery.data?.items.length ? (
+                  <Table
+                    size="small"
+                    rowKey="_id"
+                    pagination={false}
+                    dataSource={loansQuery.data.items}
+                    columns={[
+                      { title: 'Sách', dataIndex: ['book', 'title'] },
+                      { title: 'Hạn trả', render: (_, record) => formatDate(record.dueDate) },
+                      { title: 'Trạng thái', render: (_, record) => <StatusBadge status={record.status} /> },
+                    ]}
+                  />
+                ) : (
+                  <Empty description="Không có phiếu mượn" />
+                )}
+              </Card>
+            </Col>
+            <Col xs={24} xl={12}>
+              <Card title="Đặt chỗ gần đây">
+                {reservationsQuery.data?.items.length ? (
+                  <Table
+                    size="small"
+                    rowKey="_id"
+                    pagination={false}
+                    dataSource={reservationsQuery.data.items}
+                    columns={[
+                      { title: 'Sách', dataIndex: ['book', 'title'] },
+                      { title: 'Vị trí chờ', dataIndex: 'queuePosition' },
+                      { title: 'Trạng thái', render: (_, record) => <StatusBadge status={record.status} /> },
+                      { title: 'Hết hạn giữ chỗ', render: (_, record) => formatDateTime(record.holdExpiryAt) },
+                    ]}
+                  />
+                ) : (
+                  <Empty description="Không có lượt đặt chỗ" />
+                )}
+              </Card>
+            </Col>
+            <Col xs={24}>
+              <Card title="Tiền phạt gần đây">
+                {finesQuery.data?.items.length ? (
+                  <Table
+                    size="small"
+                    rowKey="_id"
+                    pagination={false}
+                    dataSource={finesQuery.data.items}
+                    columns={[
+                      { title: 'Sách', dataIndex: ['book', 'title'] },
+                      { title: 'Ngày quá hạn', render: (_, record) => formatDate(record.overdueDate) },
+                      { title: 'Số tiền', render: (_, record) => formatCurrency(record.amount) },
+                      { title: 'Trạng thái', render: (_, record) => <StatusBadge status={record.status} /> },
+                    ]}
+                  />
+                ) : (
+                  <Empty description="Không có khoản phạt" />
+                )}
+              </Card>
+            </Col>
+          </Row>
+        </>
+      ) : null}
+    </Space>
+  );
+}

@@ -1,0 +1,9 @@
+<h1>LIBERO Reserved Book Available</h1>
+<p>Hello {{fullName}},</p>
+<p>Your reserved book is now available for pickup.</p>
+<p><strong>{{title}}</strong></p>
+{{#if shelfLocation}}
+<p>Shelf location: {{shelfLocation}}</p>
+{{/if}}
+<p>Hold expires at: {{holdExpiryAt}}</p>
+<p>View your reservation: <a href="{{myReservationsLink}}">{{myReservationsLink}}</a></p>
