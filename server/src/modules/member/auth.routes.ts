@@ -11,15 +11,21 @@ import { authController } from './auth.controller';
 
 const authRouter = Router();
 
-function createAuthRateLimiter(limit: number, code: typeof ERR[keyof typeof ERR], message: string) {
+function createAuthRateLimiter(
+  keyPrefix: string,
+  limit: number,
+  code: typeof ERR[keyof typeof ERR],
+  message: string,
+  windowMs = 15 * 60 * 1000,
+) {
   return rateLimit({
-    windowMs: 15 * 60 * 1000,
+    windowMs,
     limit,
     standardHeaders: true,
     legacyHeaders: false,
     store: new RedisStore({
       sendCommand: (...args: string[]) => sendRedisCommand(...args),
-      prefix: `auth:${code.toLowerCase()}:`,
+      prefix: `auth:${keyPrefix}:`,
     }),
     handler: (req, res, next) => {
       if (!req.requestId) {
@@ -32,8 +38,15 @@ function createAuthRateLimiter(limit: number, code: typeof ERR[keyof typeof ERR]
   });
 }
 
-const loginLimiter = createAuthRateLimiter(10, ERR.AUTH_TOO_MANY_ATTEMPTS, 'Too many login attempts. Please try again later.');
-const refreshLimiter = createAuthRateLimiter(5, ERR.COMMON_RATE_LIMITED, 'Too many refresh attempts. Please try again later.');
+const loginLimiter = createAuthRateLimiter('login', 10, ERR.AUTH_TOO_MANY_ATTEMPTS, 'Too many login attempts. Please try again later.');
+const refreshLimiter = createAuthRateLimiter('refresh', 30, ERR.COMMON_RATE_LIMITED, 'Too many refresh attempts. Please try again later.');
+const registerLimiter = createAuthRateLimiter(
+  'register',
+  5,
+  ERR.COMMON_RATE_LIMITED,
+  'Too many registration attempts. Please try again later.',
+  60 * 60 * 1000,
+);
 
 authRouter.post('/login', loginLimiter, (req, res, next) => {
   void authController.login(req, res).catch(next);
@@ -47,7 +60,7 @@ authRouter.post('/logout', (req, res, next) => {
   void authController.logout(req, res).catch(next);
 });
 
-authRouter.post('/register', (req, res, next) => {
+authRouter.post('/register', registerLimiter, (req, res, next) => {
   void authController.register(req, res).catch(next);
 });
 

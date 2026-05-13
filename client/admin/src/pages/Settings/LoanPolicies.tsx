@@ -1,8 +1,11 @@
+import { EditOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Card, Form, InputNumber, Modal, Space, Table, Typography } from 'antd';
+import { Alert, Form, InputNumber, Modal } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 
+import { AdminPanel, AdminStack, secondaryButtonClass } from '../../components/AdminSurface';
+import { DataTable } from '../../components/DataTable';
 import { memberApi } from '../../services/member.api';
 import { useNotificationsStore } from '../../store/notifications.store';
 import { getRoleLabel } from '../../utils/display';
@@ -20,6 +23,7 @@ export default function LoanPoliciesPage() {
   const notify = useNotificationsStore((state) => state.push);
   const [editingRole, setEditingRole] = useState<string | null>(null);
   const [form] = Form.useForm<PolicyFormValues>();
+
   const query = useQuery({
     queryKey: ['settings', 'loan-policies'],
     queryFn: () => memberApi.listLoanPolicies(),
@@ -44,49 +48,50 @@ export default function LoanPoliciesPage() {
   });
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <div>
-        <Typography.Title level={2} style={{ marginBottom: 0 }}>
-          Chính sách mượn
-        </Typography.Title>
-        <Typography.Text type="secondary">Cấu hình giới hạn mượn và gia hạn theo từng vai trò. Chỉ quản trị viên được phép chỉnh sửa.</Typography.Text>
-      </div>
-
+    <AdminStack>
       {query.error ? <Alert type="error" showIcon message={(query.error as Error).message} /> : null}
 
-      <Card>
-        <Table
+      <AdminPanel
+        title="Bảng chính sách"
+        description="Cấu hình số lượng sách, thời hạn mượn và quyền gia hạn theo từng vai trò."
+      >
+        <DataTable
           rowKey="role"
           loading={query.isLoading}
           pagination={false}
           dataSource={query.data ?? []}
           columns={[
             { title: 'Vai trò', render: (_, record) => getRoleLabel(record.role) },
-            { title: 'Số sách tối đa', dataIndex: 'maxBooks' },
-            { title: 'Số ngày mượn', dataIndex: 'loanDays' },
-            { title: 'Số lần gia hạn tối đa', dataIndex: 'maxRenewals' },
-            { title: 'Số ngày gia hạn', dataIndex: 'renewDays' },
+            { title: 'Sách tối đa', dataIndex: 'maxBooks' },
+            { title: 'Ngày mượn', dataIndex: 'loanDays' },
+            { title: 'Lần gia hạn', dataIndex: 'maxRenewals' },
+            { title: 'Ngày gia hạn', dataIndex: 'renewDays' },
             { title: 'Hiệu lực từ', render: (_, record) => formatDate(record.effectiveFrom) },
             {
               title: 'Thao tác',
+              align: 'right',
               render: (_, record) => (
-                <Button
+                <button
+                  className={secondaryButtonClass}
                   onClick={() => {
                     setEditingRole(record.role);
                     form.setFieldsValue(record);
                   }}
+                  type="button"
                 >
+                  <EditOutlined />
                   Chỉnh sửa
-                </Button>
+                </button>
               ),
             },
           ]}
         />
-      </Card>
+      </AdminPanel>
 
       <Modal
         title={`Chỉnh sửa chính sách${editingRole ? `: ${getRoleLabel(editingRole)}` : ''}`}
         open={Boolean(editingRole)}
+        forceRender
         onCancel={() => setEditingRole(null)}
         confirmLoading={mutation.isPending}
         onOk={() => form.submit()}
@@ -108,6 +113,6 @@ export default function LoanPoliciesPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </Space>
+    </AdminStack>
   );
 }

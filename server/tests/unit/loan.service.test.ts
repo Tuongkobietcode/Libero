@@ -271,6 +271,7 @@ describe('LoanService', () => {
         isbn: book.isbn,
         title: book.title,
         bookValue: book.bookValue,
+        authors: [],
       },
       copy: {
         _id: copy.id,
@@ -371,6 +372,7 @@ describe('LoanService', () => {
         isbn: book.isbn,
         title: book.title,
         bookValue: book.bookValue,
+        authors: [],
       },
       copy: {
         _id: copy.id,

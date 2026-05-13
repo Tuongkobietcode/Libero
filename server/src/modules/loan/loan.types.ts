@@ -1,4 +1,5 @@
 import type { MemberStatus, Role, CopyStatus, FineStatus, LoanStatus } from '../../common/types/enums';
+import type { BookNameRef } from '../../common/utils/bookAuthors';
 
 export type LoanPolicyRole = Role.Student | Role.Lecturer | Role.Librarian;
 
@@ -38,6 +39,7 @@ export interface LoanBookRef {
   isbn: string;
   title: string;
   bookValue?: number;
+  authors: BookNameRef[];
 }
 
 export interface LoanCopyRef {

@@ -1,35 +1,42 @@
-import { CopyStatus, FineStatus, LoanStatus, MemberStatus, ReservationStatus, Role } from '../types/models';
+import { BookHoldStatus, CopyStatus, FineStatus, LoanStatus, MemberStatus, ReservationStatus, Role } from '../types/models';
 
 const roleLabelMap: Record<Role, string> = {
-  [Role.Student]: 'Sinh vien',
-  [Role.Lecturer]: 'Giang vien',
-  [Role.Librarian]: 'Thu thu',
-  [Role.Admin]: 'Quan tri vien',
+  [Role.Student]: 'Sinh viên',
+  [Role.Lecturer]: 'Giảng viên',
+  [Role.Librarian]: 'Thủ thư',
+  [Role.Admin]: 'Quản trị viên',
 };
 
-const statusLabelMap: Record<string, string> = {
-  [LoanStatus.Active]: 'Dang muon',
-  [LoanStatus.Overdue]: 'Qua han',
-  [LoanStatus.Returned]: 'Da tra',
-  [LoanStatus.Lost]: 'Mat sach',
-  [ReservationStatus.Waiting]: 'Dang cho',
-  [ReservationStatus.Notified]: 'Da thong bao',
-  [ReservationStatus.Fulfilled]: 'Da hoan tat',
-  [ReservationStatus.Cancelled]: 'Da huy',
-  [ReservationStatus.Expired]: 'Het han',
-  [FineStatus.Unpaid]: 'Chua thanh toan',
-  [FineStatus.Paid]: 'Da thanh toan',
-  [FineStatus.Waived]: 'Da mien',
-  [CopyStatus.Available]: 'Co san',
-  [CopyStatus.Borrowed]: 'Dang muon',
-  [CopyStatus.Reserved]: 'Dang giu cho',
-  [CopyStatus.Damaged]: 'Hu hong',
-  [CopyStatus.Lost]: 'That lac',
-  [MemberStatus.Active]: 'Hoat dong',
-  [MemberStatus.Suspended]: 'Tam khoa',
-  [MemberStatus.Expired]: 'Het han',
-  [MemberStatus.Pending]: 'Cho duyet',
+const bookHoldStatusLabelMap: Record<BookHoldStatus, string> = {
+  [BookHoldStatus.Active]: 'Đang chờ lấy',
+  [BookHoldStatus.Fulfilled]: 'Đã nhận',
+  [BookHoldStatus.Cancelled]: 'Đã trả lại',
+  [BookHoldStatus.Expired]: 'Hết hạn',
 };
+
+const statusLabelMap = new Map<string, string>([
+  [LoanStatus.Active, 'Đang mượn'],
+  [LoanStatus.Overdue, 'Quá hạn'],
+  [LoanStatus.Returned, 'Đã trả'],
+  [LoanStatus.Lost, 'Mất sách'],
+  [ReservationStatus.Waiting, 'Đang chờ'],
+  [ReservationStatus.Notified, 'Đã thông báo'],
+  [ReservationStatus.Fulfilled, 'Đã hoàn tất'],
+  [ReservationStatus.Cancelled, 'Đã hủy'],
+  [ReservationStatus.Expired, 'Hết hạn'],
+  [FineStatus.Unpaid, 'Chưa thanh toán'],
+  [FineStatus.Paid, 'Đã thanh toán'],
+  [FineStatus.Waived, 'Đã miễn'],
+  [CopyStatus.Available, 'Có sẵn'],
+  [CopyStatus.Borrowed, 'Đang mượn'],
+  [CopyStatus.Reserved, 'Đang giữ chỗ'],
+  [CopyStatus.Damaged, 'Hư hỏng'],
+  [CopyStatus.Lost, 'Thất lạc'],
+  [MemberStatus.Active, 'Hoạt động'],
+  [MemberStatus.Suspended, 'Tạm khóa'],
+  [MemberStatus.Expired, 'Hết hạn'],
+  [MemberStatus.Pending, 'Chờ duyệt'],
+]);
 
 export function getRoleLabel(role?: Role | string | null): string {
   if (!role) {
@@ -39,22 +46,30 @@ export function getRoleLabel(role?: Role | string | null): string {
   return roleLabelMap[role as Role] ?? role;
 }
 
+export function getBookHoldStatusLabel(status?: BookHoldStatus | string | null): string {
+  if (!status) {
+    return '-';
+  }
+
+  return bookHoldStatusLabelMap[status as BookHoldStatus] ?? status;
+}
+
 export function getStatusLabel(status?: string | null): string {
   if (!status) {
     return '-';
   }
 
-  return statusLabelMap[status] ?? status;
+  return statusLabelMap.get(status) ?? status;
 }
 
 export function getReservationScopeLabel(scope: 'all' | 'active' | 'history'): string {
   if (scope === 'active') {
-    return 'Dang hieu luc';
+    return 'Đang hiệu lực';
   }
 
   if (scope === 'history') {
-    return 'Lich su';
+    return 'Lịch sử';
   }
 
-  return 'Tat ca';
+  return 'Tất cả';
 }

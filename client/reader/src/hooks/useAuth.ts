@@ -13,6 +13,7 @@ import type {
   Role,
 } from '../types/models';
 import { Role as AppRole } from '../types/models';
+import { clearSessionHint, hasSessionHint, setSessionHint } from '../utils/sessionHint';
 
 function mergeUser(baseUser: AuthUser, member?: MemberView): AuthUser {
   if (!member) {
@@ -67,6 +68,7 @@ export function useBootstrapAuth(): void {
 
           if (!hasReaderAccess(mergedUser)) {
             await authApi.logout().catch(() => undefined);
+            clearSessionHint();
 
             if (mounted) {
               logout();
@@ -82,12 +84,21 @@ export function useBootstrapAuth(): void {
           return;
         }
 
+        if (!hasSessionHint()) {
+          if (mounted) {
+            logout();
+          }
+
+          return;
+        }
+
         const refreshed = await authApi.refresh();
-        const profile = await memberApi.getMe().catch(() => undefined);
+        const profile = await memberApi.getMe(refreshed.accessToken).catch(() => undefined);
         const mergedUser = mergeUser(refreshed.user, profile);
 
         if (!hasReaderAccess(mergedUser)) {
           await authApi.logout().catch(() => undefined);
+          clearSessionHint();
 
           if (mounted) {
             logout();
@@ -101,6 +112,8 @@ export function useBootstrapAuth(): void {
           setUser(mergedUser);
         }
       } catch {
+        clearSessionHint();
+
         if (mounted) {
           logout();
         }
@@ -130,12 +143,12 @@ export function useAuth() {
   const loginMutation = useMutation({
     mutationFn: async (payload: LoginPayload) => {
       const result = await authApi.login(payload);
-      const profile = await memberApi.getMe().catch(() => undefined);
+      const profile = await memberApi.getMe(result.accessToken).catch(() => undefined);
       const mergedUser = mergeUser(result.user, profile);
 
       if (!hasReaderAccess(mergedUser)) {
         await authApi.logout().catch(() => undefined);
-        throw new Error('Tai khoan nay khong thuoc khu vuc ban doc.');
+        throw new Error('Tài khoản này không thuộc khu vực bạn đọc.');
       }
 
       return {
@@ -144,6 +157,7 @@ export function useAuth() {
       };
     },
     onSuccess: (result) => {
+      setSessionHint();
       setToken(result.accessToken);
       setUser(result.user);
     },
@@ -159,6 +173,7 @@ export function useAuth() {
     } catch {
       // Ignore transport failures and clear local state.
     } finally {
+      clearSessionHint();
       logoutStore();
     }
   };

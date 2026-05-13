@@ -1,23 +1,39 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 
 import { useAuthStore } from '../store/auth.store';
+import { useNotificationsStore } from '../store/notifications.store';
 import type { ApiEnvelope } from '../types/api';
-import type { AuthUser, LoginResponse } from '../types/models';
+import { Role, type AuthUser, type LoginResponse } from '../types/models';
+import { clearSessionHint, setSessionHint } from '../utils/sessionHint';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
+const ACCESS_TOKEN_REFRESH_SKEW_MS = 30_000;
+const AUTH_REQUIRED_ERROR_CODE = 'LIBERO_AUTH_REQUIRED';
 
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
 
+interface JwtPayload {
+  exp?: number;
+}
+
+interface AuthRequiredError extends Error {
+  code: typeof AUTH_REQUIRED_ERROR_CODE;
+}
+
+const CLIENT_APP_HEADERS = { 'X-Client-App': 'reader' } as const;
+
 export const apiClient = axios.create({
   baseURL: apiBaseUrl,
   withCredentials: true,
+  headers: { ...CLIENT_APP_HEADERS },
 });
 
 export const authClient = axios.create({
   baseURL: apiBaseUrl,
   withCredentials: true,
+  headers: { ...CLIENT_APP_HEADERS },
 });
 
 function mergeUser(baseUser: AuthUser | null, partial: AuthUser): AuthUser {
@@ -25,6 +41,10 @@ function mergeUser(baseUser: AuthUser | null, partial: AuthUser): AuthUser {
     ...(baseUser ?? {}),
     ...partial,
   };
+}
+
+function isReaderUser(user: AuthUser): boolean {
+  return user.role === Role.Student || user.role === Role.Lecturer;
 }
 
 function redirectToLogin(): void {
@@ -36,20 +56,92 @@ function redirectToLogin(): void {
 }
 
 let refreshPromise: Promise<LoginResponse | null> | null = null;
+let refreshRequestPromise: Promise<LoginResponse> | null = null;
+let sessionUnavailable = false;
+
+function createAuthRequiredError(message = 'Authentication is required'): AuthRequiredError {
+  const error = new Error(message) as AuthRequiredError;
+  error.name = 'AuthRequiredError';
+  error.code = AUTH_REQUIRED_ERROR_CODE;
+  return error;
+}
+
+export function isAuthRequiredError(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error as { code?: string }).code === AUTH_REQUIRED_ERROR_CODE,
+  );
+}
+
+function decodeJwtPayload(token: string): JwtPayload | null {
+  const payload = token.split('.')[1];
+
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    return JSON.parse(window.atob(padded)) as JwtPayload;
+  } catch {
+    return null;
+  }
+}
+
+function shouldRefreshAccessToken(token: string): boolean {
+  const exp = decodeJwtPayload(token)?.exp;
+
+  if (!exp) {
+    return false;
+  }
+
+  return exp * 1000 <= Date.now() + ACCESS_TOKEN_REFRESH_SKEW_MS;
+}
+
+function invalidateClientSession(): void {
+  sessionUnavailable = true;
+  clearSessionHint();
+  useAuthStore.getState().logout();
+}
+
+export function requestTokenRefresh(): Promise<LoginResponse> {
+  if (!refreshRequestPromise) {
+    refreshRequestPromise = authClient
+      .post<ApiEnvelope<LoginResponse>>('/auth/refresh')
+      .then((response) => unwrapResponse(response.data))
+      .finally(() => {
+        refreshRequestPromise = null;
+      });
+  }
+
+  return refreshRequestPromise;
+}
 
 async function refreshSession(): Promise<LoginResponse | null> {
   if (!refreshPromise) {
-    refreshPromise = authClient
-      .post<ApiEnvelope<LoginResponse>>('/auth/refresh')
-      .then((response) => {
-        const payload = response.data.data;
+    refreshPromise = requestTokenRefresh()
+      .then((payload) => {
+        if (!isReaderUser(payload.user)) {
+          throw new Error('Invalid reader session');
+        }
+
         const authState = useAuthStore.getState();
+        sessionUnavailable = false;
+        setSessionHint();
         authState.setToken(payload.accessToken);
         authState.setUser(mergeUser(authState.user, payload.user));
         return payload;
       })
       .catch(() => {
-        useAuthStore.getState().logout();
+        invalidateClientSession();
+        useNotificationsStore.getState().push({
+          level: 'warning',
+          message: 'Phiên đăng nhập đã hết hạn',
+          description: 'Vui lòng đăng nhập lại để tiếp tục.',
+        });
         redirectToLogin();
         return null;
       })
@@ -61,13 +153,30 @@ async function refreshSession(): Promise<LoginResponse | null> {
   return refreshPromise;
 }
 
-apiClient.interceptors.request.use((config) => {
+apiClient.interceptors.request.use(async (config) => {
   const token = useAuthStore.getState().accessToken;
 
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (!token) {
+    return Promise.reject(createAuthRequiredError('Missing access token'));
   }
 
+  if (!shouldRefreshAccessToken(token)) {
+    sessionUnavailable = false;
+    config.headers.Authorization = `Bearer ${token}`;
+    return config;
+  }
+
+  if (sessionUnavailable) {
+    return Promise.reject(createAuthRequiredError('Session is no longer available'));
+  }
+
+  const refreshed = await refreshSession();
+
+  if (!refreshed?.accessToken) {
+    return Promise.reject(createAuthRequiredError('Session has expired'));
+  }
+
+  config.headers.Authorization = `Bearer ${refreshed.accessToken}`;
   return config;
 });
 

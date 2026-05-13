@@ -10,6 +10,8 @@ import { FineStatus } from '../../common/types/enums';
 import { writeAuditLog } from '../../common/utils/auditLogger';
 import { getRequiredMapValue, uniqueObjectIds } from '../../common/utils/collectionHelpers';
 import { buildMemberCacheKey } from '../../common/utils/memberCache';
+import { buildBookAuthorsMap } from '../../common/utils/bookAuthors';
+import type { BookNameRef } from '../../common/utils/bookAuthors';
 import { buildPagination, buildPaginationResult } from '../../common/utils/pagination';
 import { logger } from '../../common/middleware/requestLogger';
 import { getRedisClient } from '../../config/redis';
@@ -49,12 +51,13 @@ function createFineMemberRef(member: MemberDocument): FineMemberRef {
   };
 }
 
-function createFineBookRef(book: BookDocument): FineBookRef {
+function createFineBookRef(book: BookDocument, authors: BookNameRef[]): FineBookRef {
   return {
     _id: book._id.toString(),
     isbn: book.isbn,
     title: book.title,
     bookValue: book.bookValue,
+    authors,
   };
 }
 
@@ -262,13 +265,17 @@ export class FineService {
     ]);
     const bookIds = uniqueObjectIds(loans.map((loan) => loan.bookId));
     const books = await this.repository.findBooksByIds(bookIds);
+    const authorsByBook = await buildBookAuthorsMap(books);
 
     const memberMap = new Map<string, FineMemberRef>(
       members.map((member) => [member._id.toString(), createFineMemberRef(member)]),
     );
     const loanMap = new Map<string, LoanRecordDocument>(loans.map((loan) => [loan._id.toString(), loan]));
     const bookMap = new Map<string, FineBookRef>(
-      books.map((book) => [book._id.toString(), createFineBookRef(book)]),
+      books.map((book) => [
+        book._id.toString(),
+        createFineBookRef(book, authorsByBook.get(book._id.toString()) ?? []),
+      ]),
     );
 
     return fines.map((fine) => {

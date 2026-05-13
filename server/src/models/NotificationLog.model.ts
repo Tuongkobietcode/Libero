@@ -13,6 +13,10 @@ export interface NotificationLog {
   template: string;
   recipientEmail: string;
   subject: string;
+  title?: string | null;
+  body?: string | null;
+  link?: string | null;
+  readAt?: Date | null;
   status: NotificationLogStatus;
   sentAt: Date;
   lastError?: string | null;
@@ -53,6 +57,25 @@ const notificationLogSchema = new Schema<NotificationLog, NotificationLogModelTy
       required: true,
       trim: true,
     },
+    title: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    body: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    link: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    readAt: {
+      type: Date,
+      default: null,
+    },
     status: {
       type: String,
       enum: notificationStatuses,
@@ -77,6 +100,7 @@ const notificationLogSchema = new Schema<NotificationLog, NotificationLogModelTy
 );
 
 notificationLogSchema.index({ memberId: 1, eventType: 1, referenceId: 1, sentAt: 1 });
+notificationLogSchema.index({ memberId: 1, readAt: 1, sentAt: -1 });
 notificationLogSchema.index({ status: 1, sentAt: -1 });
 notificationLogSchema.index({ sentAt: -1 });
 

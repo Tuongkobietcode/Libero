@@ -3,8 +3,15 @@ import mongoose from 'mongoose';
 import { AuthenticationError, ConflictError, RateLimitError } from '../../src/common/errors/AppError';
 import { ERR } from '../../src/common/errors/errorCodes';
 import { MemberStatus, Role } from '../../src/common/types/enums';
+import { invalidateMemberCache } from '../../src/common/utils/memberCache';
 import { AuthService } from '../../src/modules/member/auth.service';
 import type { AuthRepository, RedisAuthStore } from '../../src/modules/member/auth.types';
+
+jest.mock('../../src/common/utils/memberCache', () => ({
+  invalidateMemberCache: jest.fn().mockResolvedValue(undefined),
+}));
+
+const mockInvalidateMemberCache = jest.mocked(invalidateMemberCache);
 
 function createRepositoryMock(): jest.Mocked<AuthRepository> {
   return {
@@ -131,6 +138,7 @@ describe('AuthService', () => {
         $set: { lockedUntil: expect.any(Date) },
       }),
     );
+    expect(mockInvalidateMemberCache).toHaveBeenCalledWith(member.id);
   });
 
   it('refreshes tokens successfully', async () => {

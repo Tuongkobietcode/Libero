@@ -12,11 +12,14 @@ import { requestLogger } from './common/middleware/requestLogger';
 import { getDatabaseStatus } from './config/database';
 import { env } from './config/env';
 import { getRedisStatus } from './config/redis';
+import { bookHoldRouter } from './modules/bookHold/bookHold.routes';
 import { catalogRouter } from './modules/catalog/catalog.routes';
-import { fineConfigRouter, fineRouter } from './modules/fine/fine.routes';
+import { configRouter } from './modules/config/config.routes';
+import { fineRouter } from './modules/fine/fine.routes';
 import { loanRouter } from './modules/loan/loan.routes';
 import { authRouter } from './modules/member/auth.routes';
-import { configRouter, memberRouter } from './modules/member/member.routes';
+import { memberRouter } from './modules/member/member.routes';
+import { notificationRouter } from './modules/notification/notification.routes';
 import { reportRouter } from './modules/report/report.routes';
 import { reservationRouter } from './modules/reservation/reservation.routes';
 
@@ -24,10 +27,15 @@ export const app = express();
 
 app.disable('x-powered-by');
 
+const allowedOrigins = (env.CORS_ORIGINS ?? env.FRONTEND_URL)
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(helmet());
 app.use(
   cors({
-    origin: env.FRONTEND_URL,
+    origin: allowedOrigins,
     credentials: true,
   }),
 );
@@ -37,14 +45,15 @@ app.use(rateLimiter);
 app.use(requestId);
 app.use(requestLogger);
 app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/book-holds', bookHoldRouter);
 app.use('/api/v1/books', catalogRouter);
 app.use('/api/v1/fines', fineRouter);
 app.use('/api/v1/loans', loanRouter);
 app.use('/api/v1/members', memberRouter);
+app.use('/api/v1/notifications', notificationRouter);
 app.use('/api/v1/reservations', reservationRouter);
 app.use('/api/v1/reports', reportRouter);
 app.use('/api/v1/config', configRouter);
-app.use('/api/v1/config', fineConfigRouter);
 
 app.get('/api/v1/health', (_req, res) => {
   const db = getDatabaseStatus();

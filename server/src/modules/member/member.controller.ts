@@ -6,6 +6,7 @@ import {
   listMembersQuerySchema,
   loanPolicyRoleParamSchema,
   memberIdParamSchema,
+  myActivitiesQuerySchema,
   suspendMemberSchema,
   updateLoanPolicySchema,
   updateMemberSchema,
@@ -32,6 +33,25 @@ export class MemberController {
 
   async getMyProfile(req: Request, res: Response): Promise<void> {
     const result = await memberService.getCurrentMember(req.user?._id ?? '');
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  }
+
+  async getMyStats(req: Request, res: Response): Promise<void> {
+    const result = await memberService.getMyStats(req.user?._id ?? '');
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  }
+
+  async getMyActivities(req: Request, res: Response): Promise<void> {
+    const query = myActivitiesQuerySchema.parse(req.query);
+    const result = await memberService.getMyActivities(req.user?._id ?? '', query.limit ?? 10);
 
     res.status(200).json({
       success: true,

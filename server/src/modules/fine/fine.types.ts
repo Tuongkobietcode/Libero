@@ -1,4 +1,5 @@
 import type { FineStatus, MemberStatus, Role } from '../../common/types/enums';
+import type { BookNameRef } from '../../common/utils/bookAuthors';
 
 export interface RequestActor {
   actorId?: string | null;
@@ -62,6 +63,7 @@ export interface FineBookRef {
   isbn: string;
   title: string;
   bookValue?: number;
+  authors: BookNameRef[];
 }
 
 export interface FineListItem {

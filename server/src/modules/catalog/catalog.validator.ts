@@ -55,6 +55,15 @@ export const searchBooksQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
+export const popularQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+  windowDays: z.coerce.number().int().min(1).max(365).optional(),
+});
+
+export const recommendationsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+});
+
 export const createBookSchema = z.object({
   isbn: z
     .string()
@@ -100,6 +109,16 @@ export const addCopiesSchema = z.object({
 export const updateCopyStatusSchema = z.object({
   status: z.nativeEnum(CopyStatus),
 });
+
+export const createCategorySchema = z.object({
+  name: nonEmptyString.max(100),
+});
+
+export const updateCategorySchema = z
+  .object({
+    name: nonEmptyString.max(100).optional(),
+  })
+  .refine((value) => Object.values(value).some((field) => field !== undefined), 'At least one field must be provided');
 
 export const csvImportRowSchema: z.ZodType<CsvImportRow> = z.object({
   isbn: z

@@ -22,6 +22,7 @@ function createRepositoryMock(): jest.Mocked<ReservationRepository> {
     countCopiesByBookId: jest.fn(),
     countAvailableCopiesByBookId: jest.fn(),
     findActiveReservationForMemberBook: jest.fn(),
+    findActiveBookHoldForMemberBook: jest.fn(),
     findLastWaitingReservationByBookId: jest.fn(),
     createReservation: jest.fn(),
     findReservationById: jest.fn(),

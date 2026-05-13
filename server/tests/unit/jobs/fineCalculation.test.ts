@@ -17,6 +17,11 @@ describe('fineCalculation job', () => {
     process.env.HOLD_EXPIRY_HOURS = '48';
     process.env.FRONTEND_URL = 'http://localhost:5173';
     jest.resetModules();
+    jest.doMock('../../../src/config/redis', () => ({
+      getRedisClient: jest.fn(() => ({
+        del: jest.fn().mockResolvedValue(1),
+      })),
+    }));
   });
 
   function createLoanFixtures() {

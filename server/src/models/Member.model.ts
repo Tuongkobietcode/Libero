@@ -17,6 +17,13 @@ export interface Member {
   lockedUntil?: Date | null;
   joinDate?: Date;
   expiryDate?: Date;
+  faculty?: string;
+  className?: string;
+  campus?: string;
+  libraryBranch?: string;
+  membershipTier?: string;
+  lastLoginAt?: Date | null;
+  passwordUpdatedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -92,6 +99,34 @@ const memberSchema = new Schema<Member, MemberModelType, MemberMethods>(
     },
     expiryDate: {
       type: Date,
+    },
+    faculty: {
+      type: String,
+      trim: true,
+    },
+    className: {
+      type: String,
+      trim: true,
+    },
+    campus: {
+      type: String,
+      trim: true,
+    },
+    libraryBranch: {
+      type: String,
+      trim: true,
+    },
+    membershipTier: {
+      type: String,
+      trim: true,
+    },
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
+    passwordUpdatedAt: {
+      type: Date,
+      default: null,
     },
   },
   {

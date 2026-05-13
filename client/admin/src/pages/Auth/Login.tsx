@@ -1,7 +1,8 @@
 import { LockOutlined, MailOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Form, Input, Typography } from 'antd';
+import { Alert, Form, Input } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 
+import { primaryButtonClass } from '../../components/AdminSurface';
 import { useAuth } from '../../hooks/useAuth';
 import { extractErrorMessage } from '../../utils/format';
 
@@ -22,28 +23,23 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'grid',
-        placeItems: 'center',
-        background: 'linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)',
-        padding: 24,
-      }}
-    >
-      <Card style={{ width: '100%', maxWidth: 420, boxShadow: '0 18px 42px rgba(15, 23, 42, 0.08)' }}>
-        <Typography.Title level={2} style={{ marginBottom: 8 }}>
-          LIBERO Quản trị
-        </Typography.Title>
-        <Typography.Paragraph type="secondary">
-          Đăng nhập bằng tài khoản thủ thư hoặc quản trị viên để quản lý danh mục sách, lưu thông, tiền phạt và báo cáo.
-        </Typography.Paragraph>
+    <main className="grid min-h-dvh place-items-center bg-[#f7f9fc] p-6 text-[#071026]">
+      <section className="w-full max-w-[440px] rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
+        <div className="mb-7 flex items-center gap-3">
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#3157ff] text-xl font-extrabold text-white shadow-[0_14px_30px_rgba(49,87,255,0.22)]">
+            L
+          </span>
+          <div>
+            <h1 className="m-0 text-2xl font-black tracking-tight">LIBERO Admin</h1>
+            <p className="m-0 mt-1 text-sm font-semibold text-slate-500">Đăng nhập bằng tài khoản thủ thư hoặc quản trị viên.</p>
+          </div>
+        </div>
 
         {loginState.isError ? (
           <Alert
             type="error"
             showIcon
-            style={{ marginBottom: 16 }}
+            className="mb-4"
             message={extractErrorMessage(loginState.error, 'Không thể đăng nhập')}
           />
         ) : null}
@@ -55,11 +51,11 @@ export default function LoginPage() {
           <Form.Item label="Mật khẩu" name="password" rules={[{ required: true }]}>
             <Input.Password prefix={<LockOutlined />} autoComplete="current-password" placeholder="Nhập mật khẩu" />
           </Form.Item>
-          <Button type="primary" htmlType="submit" block loading={loginState.isPending}>
+          <button className={`${primaryButtonClass} w-full`} disabled={loginState.isPending} type="submit">
             Đăng nhập
-          </Button>
+          </button>
         </Form>
-      </Card>
-    </div>
+      </section>
+    </main>
   );
 }

@@ -68,6 +68,8 @@ function createBookDocument(overrides: Record<string, unknown> = {}) {
     isbn: '9781234567890',
     title: 'Domain-Driven Design',
     bookValue: 120000,
+    authorIds: [],
+    categoryIds: [],
     ...overrides,
   } as any;
 }

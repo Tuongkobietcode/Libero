@@ -1,8 +1,9 @@
 import { DownloadOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Button, Card, Empty, Select, Space, Typography } from 'antd';
+import { Alert, Empty, Select } from 'antd';
 import { useState } from 'react';
 
+import { AdminPanel, AdminStack, AdminToolbar, secondaryButtonClass } from '../../components/AdminSurface';
 import { DataTable } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
 import { reportApi } from '../../services/report.api';
@@ -31,37 +32,31 @@ export default function OverdueListPage() {
   };
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <div>
-        <Typography.Title level={2} style={{ marginBottom: 0 }}>
-          Danh sách quá hạn
-        </Typography.Title>
-        <Typography.Text type="secondary">Hàng chờ tác nghiệp cho toàn bộ phiếu mượn quá hạn, sắp xếp để dễ theo dõi.</Typography.Text>
-      </div>
-
-      <Card>
-        <Space wrap>
-          <Select
-            value={sort}
-            style={{ width: 220 }}
-            onChange={(value) => setSort(value)}
-            options={[
-              { label: 'Số ngày quá hạn giảm dần', value: 'overdueDays_desc' },
-              { label: 'Số ngày quá hạn tăng dần', value: 'overdueDays_asc' },
-              { label: 'Hạn trả giảm dần', value: 'dueDate_desc' },
-              { label: 'Hạn trả tăng dần', value: 'dueDate_asc' },
-            ]}
-          />
-          <Button icon={<DownloadOutlined />} onClick={() => void handleExport('xlsx')}>
-            Xuất XLSX
-          </Button>
-          <Button onClick={() => void handleExport('pdf')}>Xuất PDF</Button>
-        </Space>
-      </Card>
+    <AdminStack>
+      <AdminToolbar>
+        <Select
+          value={sort}
+          className="min-w-72"
+          onChange={(value) => setSort(value)}
+          options={[
+            { label: 'Số ngày quá hạn giảm dần', value: 'overdueDays_desc' },
+            { label: 'Số ngày quá hạn tăng dần', value: 'overdueDays_asc' },
+            { label: 'Hạn trả giảm dần', value: 'dueDate_desc' },
+            { label: 'Hạn trả tăng dần', value: 'dueDate_asc' },
+          ]}
+        />
+        <button className={secondaryButtonClass} onClick={() => void handleExport('xlsx')} type="button">
+          <DownloadOutlined />
+          Xuất XLSX
+        </button>
+        <button className={secondaryButtonClass} onClick={() => void handleExport('pdf')} type="button">
+          Xuất PDF
+        </button>
+      </AdminToolbar>
 
       {query.error ? <Alert type="error" showIcon message={(query.error as Error).message} /> : null}
 
-      <Card>
+      <AdminPanel title="Danh sách quá hạn" description="Hàng chờ tác nghiệp cho toàn bộ khoản mượn quá hạn.">
         {query.data?.items.length ? (
           <DataTable
             rowKey="_id"
@@ -87,7 +82,7 @@ export default function OverdueListPage() {
         ) : (
           <Empty description="Không có phiếu mượn quá hạn." />
         )}
-      </Card>
-    </Space>
+      </AdminPanel>
+    </AdminStack>
   );
 }

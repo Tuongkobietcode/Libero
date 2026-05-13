@@ -7,8 +7,10 @@ import { env } from './config/env';
 import { closeJobQueues } from './config/queue';
 import { closeRedisConnection, connectToRedis } from './config/redis';
 import { registerJobs, type JobRuntime } from './jobs';
+import { disconnectRealtime, initializeRealtime } from './realtime/realtime';
 
 const server = http.createServer(app);
+initializeRealtime(server);
 
 let shuttingDown = false;
 let jobRuntime: JobRuntime | null = null;
@@ -33,6 +35,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
 
   shuttingDown = true;
   logger.info({ signal }, 'Graceful shutdown started');
+  disconnectRealtime();
 
   await new Promise<void>((resolve, reject) => {
     server.close((error) => {

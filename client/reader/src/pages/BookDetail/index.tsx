@@ -1,42 +1,78 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 
 import { useAuth } from '../../hooks/useAuth';
 import { catalogApi } from '../../services/catalog.api';
+import { bookHoldApi } from '../../services/bookHold.api';
 import { reservationApi } from '../../services/reservation.api';
-import { CopyStatus, ReservationStatus, Role } from '../../types/models';
-import { getStatusLabel } from '../../utils/display';
-import { extractErrorMessage, formatCurrency, formatDate, formatDateTime, formatList } from '../../utils/format';
+import { useNotificationsStore } from '../../store/notifications.store';
+import { queryKeys } from '../../lib/queryKeys';
+import { BookHoldStatus, ReservationStatus, Role } from '../../types/models';
+import { extractErrorMessage } from '../../utils/format';
+import { Card } from '../../components/ui/Card';
+import { Spinner } from '../../components/ui/Spinner';
+
+import { BookSidebar } from './sections/BookSidebar';
+import { BookHero } from './sections/BookHero';
+import { AvailabilityCard } from './sections/AvailabilityCard';
+import { CopiesTable } from './sections/CopiesTable';
+import { RelatedBooks } from './sections/RelatedBooks';
 
 export default function BookDetailPage() {
   const { id = '' } = useParams();
-  const location = useLocation();
   const queryClient = useQueryClient();
   const { isAuthenticated, user } = useAuth();
+  const notify = useNotificationsStore((state) => state.push);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const bookQuery = useQuery({
-    queryKey: ['reader-book-detail', id],
+    queryKey: queryKeys.bookDetail(id),
     queryFn: () => catalogApi.getBook(id),
     enabled: Boolean(id),
+    meta: { errorMessage: 'Không thể tải thông tin sách.' },
   });
 
   const myReservationsQuery = useQuery({
-    queryKey: ['reader-book-detail-active-reservations', user?._id],
+    queryKey: ['reader', 'book-detail-active-reservations', user?._id ?? ''] as const,
     queryFn: () => reservationApi.listMyReservations({ scope: 'active', page: 1, limit: 100 }),
+    enabled: isAuthenticated,
+  });
+
+  const myBookHoldsQuery = useQuery({
+    queryKey: ['reader', 'book-detail-active-holds', user?._id ?? ''] as const,
+    queryFn: () => bookHoldApi.listMyHolds({ status: BookHoldStatus.Active, page: 1, limit: 100 }),
     enabled: isAuthenticated,
   });
 
   const reserveMutation = useMutation({
     mutationFn: () => reservationApi.createReservation(id),
     onSuccess: () => {
-      setFeedback('Dat cho thanh cong. Ban co the theo doi vi tri hang cho trong muc Dat cho.');
-      void queryClient.invalidateQueries({ queryKey: ['reader-book-detail-active-reservations'] });
-      void queryClient.invalidateQueries({ queryKey: ['reader-my-reservations'] });
+      setFeedback('Đặt chỗ thành công. Bạn có thể theo dõi vị trí hàng chờ trong mục Đặt chỗ.');
+      void queryClient.invalidateQueries({ queryKey: ['reader', 'book-detail-active-reservations'] });
+      void queryClient.invalidateQueries({ queryKey: ['reader', 'my-reservations'] });
     },
     onError: (error) => {
-      setFeedback(extractErrorMessage(error, 'Khong the tao yeu cau dat cho luc nay.'));
+      notify({
+        level: 'error',
+        message: extractErrorMessage(error, 'Không thể tạo yêu cầu đặt chỗ lúc này.'),
+      });
+    },
+  });
+
+  const holdMutation = useMutation({
+    mutationFn: () => bookHoldApi.createHold(id),
+    onSuccess: () => {
+      setFeedback('Đặt giữ thành công. Thư viện đã giữ một bản sách cho bạn trong 24 giờ.');
+      void queryClient.invalidateQueries({ queryKey: queryKeys.bookDetail(id) });
+      void queryClient.invalidateQueries({ queryKey: ['reader', 'book-detail-active-holds'] });
+    },
+    onError: (error) => {
+      notify({
+        level: 'error',
+        message: extractErrorMessage(error, 'Không thể tạo yêu cầu đặt giữ lúc này.'),
+      });
     },
   });
 
@@ -48,172 +84,77 @@ export default function BookDetailPage() {
     );
   }, [id, myReservationsQuery.data?.items]);
 
-  const availableCopies = useMemo(
-    () => bookQuery.data?.copies.filter((copy) => copy.status === CopyStatus.Available) ?? [],
-    [bookQuery.data?.copies],
-  );
   const book = bookQuery.data;
+  const activeHold = useMemo(() => {
+    return myBookHoldsQuery.data?.items.find((hold) => hold.book._id === id && hold.status === BookHoldStatus.Active);
+  }, [id, myBookHoldsQuery.data?.items]);
+
+  useEffect(() => {
+    setFeedback(null);
+  }, [id]);
+
+  if (bookQuery.isLoading) {
+    return (
+      <div className="flex min-h-[360px] items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!book) {
+    return (
+      <Card padding="lg" className="text-center">
+        <h2 className="text-lg font-bold text-slate-800">Không tìm thấy đầu sách</h2>
+        <p className="mt-1 text-sm text-slate-500">Có thể sách đã bị gỡ khỏi thư viện.</p>
+        <Link to="/search" className="mt-4 inline-flex text-sm font-semibold text-brand-600">
+          ← Quay lại tìm kiếm
+        </Link>
+      </Card>
+    );
+  }
 
   const canReaderReserve = user?.role === Role.Student || user?.role === Role.Lecturer;
   const isBlocked = Boolean(user?.isBlocked);
-  const canReserve = book
-    ? book.availableCopies === 0 && !activeReservation && isAuthenticated && canReaderReserve && !isBlocked
-    : false;
 
   return (
-    <div className="page-stack">
-      {bookQuery.isLoading ? <div className="loading-state">Dang tai chi tiet sach...</div> : null}
-      {bookQuery.isError ? (
-        <div className="error-banner">{extractErrorMessage(bookQuery.error, 'Khong the tai thong tin sach.')}</div>
-      ) : null}
-      {!bookQuery.isLoading && !bookQuery.isError && book ? (
-        <>
-          <section className="detail-grid">
-            <article className="card">
-              <div className="card-header">
-                <div>
-                  <h1 className="page-title">{book.title}</h1>
-                  <p className="page-description">
-                    {formatList(book.authors, 'Chua cap nhat tac gia')} • ISBN {book.isbn}
-                  </p>
-                </div>
-                <span className={`badge ${book.availableCopies > 0 ? 'success' : 'warning'}`}>
-                  {book.availableCopies > 0 ? `${book.availableCopies} ban con san` : 'Tat ca da duoc muon/giu cho'}
-                </span>
-              </div>
+    <div className="flex flex-col gap-4 py-2">
+      <Link
+        to="/search"
+        className="inline-flex w-fit items-center gap-2 rounded-lg px-1 py-1 text-sm font-semibold text-slate-500 hover:text-brand-600 transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden />
+        Quay lại tìm kiếm
+      </Link>
 
-              <div className="meta-list">
-                <div className="meta-row">
-                  <span className="meta-label">Danh muc</span>
-                  <span>{formatList(book.categories, 'Dang cap nhat')}</span>
-                </div>
-                <div className="meta-row">
-                  <span className="meta-label">Nha xuat ban</span>
-                  <span>{book.publisher ?? '-'}</span>
-                </div>
-                <div className="meta-row">
-                  <span className="meta-label">Nam xuat ban</span>
-                  <span>{book.publishYear ?? '-'}</span>
-                </div>
-                <div className="meta-row">
-                  <span className="meta-label">Gia tri sach</span>
-                  <span>{formatCurrency(book.bookValue)}</span>
-                </div>
-                <div className="meta-row">
-                  <span className="meta-label">Mo ta</span>
-                  <span>{book.description ?? 'Chua co mo ta cho dau sach nay.'}</span>
-                </div>
-              </div>
-            </article>
+      <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <BookSidebar book={book} />
 
-            <aside className="card">
-              <div className="card-header">
-                <div>
-                  <h2 className="card-title">Tinh trang muon</h2>
-                  <p className="card-subtitle">Reader chi xem availability, khong tu muon tai giao dien nay.</p>
-                </div>
-              </div>
-
-              {book.availableCopies > 0 ? (
-                <div className="page-stack">
-                  <div className="success-banner">
-                    Sach dang con ban sao available. Ban co the den thu vien de lam thu tuc muon.
-                  </div>
-                  <div>
-                    <strong>Vi tri ke goi y</strong>
-                    <div className="shelf-list" style={{ marginTop: 10 }}>
-                      {availableCopies.map((copy) => (
-                        <span className="shelf-pill" key={copy._id}>
-                          {copy.shelfLocation || 'Dang cap nhat ke'}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : activeReservation ? (
-                <div className="notice">
-                  Ban da co yeu cau dat cho dang hieu luc cho dau sach nay. Vi tri hien tai: #{activeReservation.queuePosition}.
-                </div>
-              ) : canReserve ? (
-                <div className="page-stack">
-                  <div className="warning-banner">
-                    Hien tai tat ca ban sao deu dang duoc muon hoac giu cho. Ban co the dat cho de xep hang.
-                  </div>
-                  <button className="button" type="button" onClick={() => reserveMutation.mutate()} disabled={reserveMutation.isPending}>
-                    {reserveMutation.isPending ? 'Dang gui yeu cau...' : 'Dat cho sach nay'}
-                  </button>
-                </div>
-              ) : isAuthenticated ? (
-                <div className="notice">
-                  {isBlocked
-                    ? 'Tai khoan cua ban dang bi khoa nen khong the dat cho them. Vui long xu ly cac nghia vu con ton tai thu vien.'
-                    : 'Chi sinh vien va giang vien moi duoc dat cho tren giao dien ban doc, hoac tai khoan hien tai khong du dieu kien.'}
-                </div>
-              ) : (
-                <div className="page-stack">
-                  <div className="warning-banner">
-                    Dang nhap de dat cho khi dau sach khong con ban sao available.
-                  </div>
-                  <Link className="button" to="/login" state={{ from: location }}>
-                    Dang nhap de dat cho
-                  </Link>
-                </div>
-              )}
-
-              {feedback ? (
-                <div className={reserveMutation.isError ? 'error-banner' : 'success-banner'}>{feedback}</div>
-              ) : null}
-            </aside>
-          </section>
-
-          <section className="card">
-            <div className="card-header">
-              <div>
-                <h2 className="card-title">Trang thai tung ban sao</h2>
-                <p className="card-subtitle">Thong tin nay giup ban doc uoc luong kha nang co sach tai thu vien.</p>
+        <main className="flex min-w-0 flex-col gap-6">
+          <Card padding="lg">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+              <BookHero book={book} />
+              <div className="xl:border-l xl:border-slate-100 xl:pl-6">
+                <AvailabilityCard
+                  book={book}
+                  isAuthenticated={isAuthenticated}
+                  canReaderReserve={canReaderReserve}
+                  isBlocked={isBlocked}
+                  activeReservation={activeReservation}
+                  activeHold={activeHold}
+                  feedback={feedback}
+                  isReserving={reserveMutation.isPending}
+                  isHolding={holdMutation.isPending}
+                  onReserve={() => reserveMutation.mutate()}
+                  onHold={() => holdMutation.mutate()}
+                />
               </div>
             </div>
+          </Card>
 
-            {book.copies.length > 0 ? (
-              <div className="status-list">
-                {book.copies.map((copy, index) => (
-                  <div key={copy._id} className="list-card">
-                    <div className="card-header">
-                      <div>
-                        <h3 className="list-card-title">Ban sao {index + 1}</h3>
-                        <p className="list-card-subtitle">Ke sach: {copy.shelfLocation || 'Dang cap nhat'}</p>
-                      </div>
-                      <span className={`badge ${copy.status === CopyStatus.Available ? 'success' : copy.status === CopyStatus.Borrowed ? 'warning' : 'muted'}`}>
-                        {getStatusLabel(copy.status)}
-                      </span>
-                    </div>
-
-                    <div className="meta-list">
-                      <div className="meta-row">
-                        <span className="meta-label">Ngay nhap</span>
-                        <span>{formatDate(copy.acquiredDate)}</span>
-                      </div>
-                      <div className="meta-row">
-                        <span className="meta-label">Han tra hien tai</span>
-                        <span>{formatDateTime(copy.currentDueDate)}</span>
-                      </div>
-                      <div className="meta-row">
-                        <span className="meta-label">Trang thai phieu muon</span>
-                        <span>{getStatusLabel(copy.currentLoanStatus)}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">
-                <h3>Chua co ban sao nao</h3>
-                <p className="page-description">Thu vien chua cap nhat ban sao cho dau sach nay.</p>
-              </div>
-            )}
-          </section>
-        </>
-      ) : null}
+          <CopiesTable book={book} />
+          <RelatedBooks currentBookId={book._id} />
+        </main>
+      </div>
     </div>
   );
 }

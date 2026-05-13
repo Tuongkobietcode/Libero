@@ -7,6 +7,7 @@ import { useAuthStore } from '../store/auth.store';
 import { useNotificationsStore } from '../store/notifications.store';
 import type { AuthUser, LoginPayload, MemberView, Role } from '../types/models';
 import { Role as AppRole } from '../types/models';
+import { clearSessionHint, hasSessionHint, setSessionHint } from '../utils/sessionHint';
 
 function mergeUser(baseUser: AuthUser, member?: MemberView): AuthUser {
   if (!member) {
@@ -61,6 +62,7 @@ export function useBootstrapAuth(): void {
 
           if (!hasBackofficeAccess(mergedUser)) {
             await authApi.logout().catch(() => undefined);
+            clearSessionHint();
 
             if (mounted) {
               logout();
@@ -76,12 +78,21 @@ export function useBootstrapAuth(): void {
           return;
         }
 
+        if (!hasSessionHint()) {
+          if (mounted) {
+            logout();
+          }
+
+          return;
+        }
+
         const refreshed = await authApi.refresh();
-        const profile = await memberApi.getMe().catch(() => undefined);
+        const profile = await memberApi.getMe(refreshed.accessToken).catch(() => undefined);
         const mergedUser = mergeUser(refreshed.user, profile);
 
         if (!hasBackofficeAccess(mergedUser)) {
           await authApi.logout().catch(() => undefined);
+          clearSessionHint();
 
           if (mounted) {
             logout();
@@ -95,6 +106,8 @@ export function useBootstrapAuth(): void {
           setUser(mergedUser);
         }
       } catch {
+        clearSessionHint();
+
         if (mounted) {
           logout();
         }
@@ -125,7 +138,7 @@ export function useAuth() {
   const loginMutation = useMutation({
     mutationFn: async (payload: LoginPayload) => {
       const result = await authApi.login(payload);
-      const profile = await memberApi.getMe().catch(() => undefined);
+      const profile = await memberApi.getMe(result.accessToken).catch(() => undefined);
       const mergedUser = mergeUser(result.user, profile);
 
       if (!hasBackofficeAccess(mergedUser)) {
@@ -139,6 +152,7 @@ export function useAuth() {
       };
     },
     onSuccess: (result) => {
+      setSessionHint();
       setToken(result.accessToken);
       setUser(result.user);
       notify({
@@ -155,6 +169,7 @@ export function useAuth() {
     } catch {
       // Ignore transport failures and clear client state.
     } finally {
+      clearSessionHint();
       logoutStore();
     }
   };

@@ -1,4 +1,5 @@
 import type { CopyStatus, MemberStatus, ReservationStatus, Role } from '../../common/types/enums';
+import type { BookNameRef } from '../../common/utils/bookAuthors';
 
 export type ReservationScope = 'all' | 'active' | 'history';
 
@@ -30,6 +31,8 @@ export interface ReservationBookRef {
   isbn: string;
   title: string;
   bookValue?: number;
+  authors: BookNameRef[];
+  categories: BookNameRef[];
 }
 
 export interface ReservationCopyRef {
@@ -55,6 +58,7 @@ export interface ReservationListItem {
   book: ReservationBookRef;
   copy?: ReservationCopyRef;
   queuePosition: number;
+  queueTotal: number;
   status: ReservationStatus;
   requestDate: Date;
   notifiedAt?: Date | null;

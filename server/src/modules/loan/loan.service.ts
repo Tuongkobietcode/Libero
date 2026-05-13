@@ -19,6 +19,8 @@ import { getRequiredMapValue, uniqueObjectIds } from '../../common/utils/collect
 import { addDays, addHours } from '../../common/utils/dateHelpers';
 import { buildOverdueDates, getApplicableFineRate } from '../../common/utils/loanFine';
 import { buildMemberCacheKey } from '../../common/utils/memberCache';
+import { buildBookAuthorsMap } from '../../common/utils/bookAuthors';
+import type { BookNameRef } from '../../common/utils/bookAuthors';
 import { recalculateMemberBlock, type BlockRecalculationResult } from '../../common/utils/memberBlock';
 import { buildPagination, buildPaginationResult } from '../../common/utils/pagination';
 import { logger } from '../../common/middleware/requestLogger';
@@ -71,12 +73,13 @@ function createLoanMemberRef(member: MemberDocument): LoanMemberRef {
   };
 }
 
-function createLoanBookRef(book: BookDocument): LoanBookRef {
+function createLoanBookRef(book: BookDocument, authors: BookNameRef[]): LoanBookRef {
   return {
     _id: book._id.toString(),
     isbn: book.isbn,
     title: book.title,
     bookValue: book.bookValue,
+    authors,
   };
 }
 
@@ -163,6 +166,7 @@ export class LoanService {
 
         let borrowedCopy: BookCopyDocument | null = null;
         let reservationId: string | null = null;
+        let bookHoldId: string | null = null;
 
         if (copy.status === CopyStatus.Available) {
           borrowedCopy = await this.repository.updateCopyStatusIfCurrent(
@@ -180,7 +184,17 @@ export class LoanService {
             session,
           );
 
-          if (!reservation) {
+          const bookHold = reservation
+            ? null
+            : await this.repository.findActiveBookHoldForMemberBookCopy(
+                memberId,
+                copy.bookId,
+                copyId,
+                now,
+                session,
+              );
+
+          if (!reservation && !bookHold) {
             throw new BusinessRuleError(ERR.LOAN_COPY_NOT_AVAILABLE, 422, 'Book copy is not available for checkout');
           }
 
@@ -190,7 +204,8 @@ export class LoanService {
             CopyStatus.Borrowed,
             session,
           );
-          reservationId = reservation._id.toString();
+          reservationId = reservation?._id.toString() ?? null;
+          bookHoldId = bookHold?._id.toString() ?? null;
         } else {
           throw new BusinessRuleError(ERR.LOAN_COPY_NOT_AVAILABLE, 422, 'Book copy is not available for checkout');
         }
@@ -220,6 +235,10 @@ export class LoanService {
 
         if (reservationId) {
           await this.repository.fulfillReservationById(reservationId, session);
+        }
+
+        if (bookHoldId) {
+          await this.repository.fulfillBookHoldById(bookHoldId, now, session);
         }
       });
     } finally {
@@ -658,8 +677,15 @@ export class LoanService {
       this.repository.findFineRecordsByLoanIds(loanIds),
     ]);
 
+    const authorsByBook = await buildBookAuthorsMap(books);
+
     const memberMap = new Map<string, LoanMemberRef>(members.map((member) => [member._id.toString(), createLoanMemberRef(member)]));
-    const bookMap = new Map<string, LoanBookRef>(books.map((book) => [book._id.toString(), createLoanBookRef(book)]));
+    const bookMap = new Map<string, LoanBookRef>(
+      books.map((book) => [
+        book._id.toString(),
+        createLoanBookRef(book, authorsByBook.get(book._id.toString()) ?? []),
+      ]),
+    );
     const copyMap = new Map<string, LoanCopyRef>(copies.map((copy) => [copy._id.toString(), createLoanCopyRef(copy)]));
     const fineMap = new Map<string, LoanFineView[]>();
 

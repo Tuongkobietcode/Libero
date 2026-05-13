@@ -31,5 +31,9 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status }: StatusBadgeProps) {
-  return <Tag color={statusColorMap[status] ?? 'default'}>{getStatusLabel(status)}</Tag>;
+  return (
+    <Tag className="!m-0 !rounded-lg !px-2.5 !py-1 !text-xs !font-extrabold" color={statusColorMap[status] ?? 'default'}>
+      {getStatusLabel(status)}
+    </Tag>
+  );
 }

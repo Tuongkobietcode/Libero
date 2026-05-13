@@ -1,9 +1,10 @@
 import { Types, type ClientSession, type FilterQuery } from 'mongoose';
 
-import { FineStatus, LoanStatus, ReservationStatus } from '../../common/types/enums';
+import { BookHoldStatus, FineStatus, LoanStatus, ReservationStatus } from '../../common/types/enums';
 import type { CopyStatus } from '../../common/types/enums';
 import { BookModel, type BookDocument } from '../../models/Book.model';
 import { BookCopyModel, type BookCopyDocument } from '../../models/BookCopy.model';
+import { BookHoldModel, type BookHoldDocument } from '../../models/BookHold.model';
 import { FineRateModel, type FineRateDocument } from '../../models/FineRate.model';
 import { FineRecordModel, type FineRecord, type FineRecordDocument } from '../../models/FineRecord.model';
 import { LoanPolicyModel, type LoanPolicyDocument } from '../../models/LoanPolicy.model';
@@ -178,6 +179,41 @@ export class LoanRepository {
     }
 
     return query.exec();
+  }
+
+  async findActiveBookHoldForMemberBookCopy(
+    memberId: string | Types.ObjectId,
+    bookId: string | Types.ObjectId,
+    copyId: string | Types.ObjectId,
+    currentTime: Date,
+    session?: ClientSession,
+  ): Promise<BookHoldDocument | null> {
+    let query = BookHoldModel.findOne({
+      memberId,
+      bookId,
+      copyId,
+      status: BookHoldStatus.Active,
+      holdExpiryAt: { $gte: currentTime },
+    });
+
+    if (session) {
+      query = query.session(session);
+    }
+
+    return query.exec();
+  }
+
+  async fulfillBookHoldById(holdId: string | Types.ObjectId, fulfilledAt: Date, session: ClientSession): Promise<void> {
+    await BookHoldModel.updateOne(
+      { _id: holdId },
+      {
+        $set: {
+          status: BookHoldStatus.Fulfilled,
+          fulfilledAt,
+        },
+      },
+      { session },
+    ).exec();
   }
 
   async fulfillReservationById(reservationId: string | Types.ObjectId, session: ClientSession): Promise<void> {

@@ -94,14 +94,14 @@ describe('BookDetailPage', () => {
       { route: '/books/book-1' },
     );
 
-    const reserveButton = await screen.findByRole('button', { name: 'Dat cho sach nay' });
+    const reserveButton = await screen.findByRole('button', { name: 'Đặt chỗ sách này' });
     await userEvent.click(reserveButton);
 
     await waitFor(() => {
       expect(createReservationMock).toHaveBeenCalledWith('book-1');
     });
 
-    expect(await screen.findByText(/Dat cho thanh cong/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Đặt chỗ thành công/i)).toBeInTheDocument();
   });
 
   it('does not allow blocked readers to reserve even when all copies are unavailable', async () => {
@@ -145,9 +145,9 @@ describe('BookDetailPage', () => {
     );
 
     expect(await screen.findByText('Unavailable Book')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Dat cho sach nay' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Đặt chỗ sách này' })).not.toBeInTheDocument();
     expect(
-      screen.getByText(/Tai khoan cua ban dang bi khoa nen khong the dat cho them/i),
+      screen.getByText(/Tài khoản của bạn đang bị khóa nên không thể đặt chỗ thêm/i),
     ).toBeInTheDocument();
     expect(createReservationMock).not.toHaveBeenCalled();
   });

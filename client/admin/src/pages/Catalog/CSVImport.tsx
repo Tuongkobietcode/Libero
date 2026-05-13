@@ -1,8 +1,10 @@
-import { InboxOutlined } from '@ant-design/icons';
+import { InboxOutlined, UploadOutlined } from '@ant-design/icons';
 import { useMutation } from '@tanstack/react-query';
-import { Alert, Button, Card, Empty, Space, Table, Typography, Upload } from 'antd';
+import { Alert, Empty, Upload } from 'antd';
 import { useState } from 'react';
 
+import { AdminPanel, AdminStack, primaryButtonClass } from '../../components/AdminSurface';
+import { DataTable } from '../../components/DataTable';
 import { catalogApi } from '../../services/catalog.api';
 import { useNotificationsStore } from '../../store/notifications.store';
 import { extractErrorMessage } from '../../utils/format';
@@ -29,17 +31,11 @@ export default function CSVImportPage() {
   });
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <div>
-        <Typography.Title level={2} style={{ marginBottom: 0 }}>
-          Nhập dữ liệu CSV
-        </Typography.Title>
-        <Typography.Text type="secondary">
-          Tải hàng loạt sách bằng tệp CSV và xem lỗi theo từng dòng trước khi nhập lại.
-        </Typography.Text>
-      </div>
-
-      <Card>
+    <AdminStack>
+      <AdminPanel
+        title="Tệp dữ liệu"
+        description="Tải hàng loạt sách bằng CSV. Các cột cần có: isbn, title, author, category, quantity, shelfLocation."
+      >
         <Upload.Dragger
           accept=".csv"
           maxCount={1}
@@ -53,26 +49,43 @@ export default function CSVImportPage() {
             <InboxOutlined />
           </p>
           <p className="ant-upload-text">Kéo thả tệp CSV vào đây hoặc bấm để chọn tệp</p>
-          <p className="ant-upload-hint">Các cột mong đợi: isbn, title, author, category, quantity, shelfLocation</p>
+          <p className="ant-upload-hint">Hệ thống sẽ trả về lỗi theo từng dòng nếu dữ liệu chưa hợp lệ.</p>
         </Upload.Dragger>
-        <Space style={{ marginTop: 16 }}>
-          <Button type="primary" disabled={!file} loading={importMutation.isPending} onClick={() => importMutation.mutate()}>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            className={primaryButtonClass}
+            disabled={!file || importMutation.isPending}
+            onClick={() => importMutation.mutate()}
+            type="button"
+          >
+            <UploadOutlined />
             Nhập tệp
-          </Button>
-          <Typography.Text type="secondary">{file ? file.name : 'Chưa chọn tệp nào'}</Typography.Text>
-        </Space>
-      </Card>
+          </button>
+          <span className="text-sm font-semibold text-slate-500">{file ? file.name : 'Chưa chọn tệp nào'}</span>
+        </div>
+      </AdminPanel>
 
       {importMutation.isError ? (
         <Alert type="error" showIcon message={extractErrorMessage(importMutation.error, 'Nhập dữ liệu thất bại')} />
       ) : null}
 
-      <Card title="Kết quả nhập dữ liệu">
+      <AdminPanel title="Kết quả nhập dữ liệu">
         {importMutation.data ? (
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Typography.Text>{`Thành công: ${importMutation.data.successCount} | Thất bại: ${importMutation.data.failedCount}`}</Typography.Text>
+          <div className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl bg-emerald-50 p-4">
+                <p className="m-0 text-sm font-extrabold text-emerald-700">Thành công</p>
+                <p className="m-0 mt-2 text-3xl font-black text-emerald-700">{importMutation.data.successCount}</p>
+              </div>
+              <div className="rounded-xl bg-red-50 p-4">
+                <p className="m-0 text-sm font-extrabold text-red-700">Thất bại</p>
+                <p className="m-0 mt-2 text-3xl font-black text-red-700">{importMutation.data.failedCount}</p>
+              </div>
+            </div>
+
             {importMutation.data.errors.length ? (
-              <Table
+              <DataTable
                 size="small"
                 rowKey={(record) => `${record.row}-${record.isbn ?? 'unknown'}`}
                 pagination={false}
@@ -86,11 +99,11 @@ export default function CSVImportPage() {
             ) : (
               <Empty description="Không có lỗi theo từng dòng" />
             )}
-          </Space>
+          </div>
         ) : (
           <Empty description="Hãy tải tệp CSV để xem kết quả nhập dữ liệu." />
         )}
-      </Card>
-    </Space>
+      </AdminPanel>
+    </AdminStack>
   );
 }

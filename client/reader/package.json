@@ -12,12 +12,15 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@libero/shared": "*",
     "@tanstack/react-query": "^5.80.10",
     "axios": "^1.9.0",
     "dayjs": "^1.11.13",
+    "lucide-react": "^1.14.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.0",
+    "socket.io-client": "^4.8.3",
     "zustand": "^4.5.4"
   },
   "devDependencies": {

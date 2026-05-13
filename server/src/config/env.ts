@@ -30,6 +30,23 @@ const envSchema = z.object({
   FINE_BLOCK_THRESHOLD: z.coerce.number().int().nonnegative(),
   HOLD_EXPIRY_HOURS: z.coerce.number().int().positive(),
   FRONTEND_URL: z.string().url(),
+  CORS_ORIGINS: z
+    .string()
+    .optional()
+    .refine(
+      (value) => {
+        if (!value) {
+          return true;
+        }
+
+        return value
+          .split(',')
+          .map((origin) => origin.trim())
+          .filter(Boolean)
+          .every((origin) => z.string().url().safeParse(origin).success);
+      },
+      { message: 'CORS_ORIGINS must be a comma-separated list of valid URLs' },
+    ),
 });
 
 const parsed = envSchema.safeParse(process.env);

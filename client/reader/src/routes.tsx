@@ -1,7 +1,9 @@
 import type { ReactElement } from 'react';
 import { Navigate, createBrowserRouter, useLocation } from 'react-router-dom';
 
+import { FullScreenLoader } from './components/ui';
 import { useAuth, useBootstrapAuth } from './hooks/useAuth';
+import AuthLayout from './layouts/AuthLayout';
 import ReaderLayout from './layouts/ReaderLayout';
 import BookDetailPage from './pages/BookDetail';
 import HomePage from './pages/Home';
@@ -12,10 +14,6 @@ import MyReservationsPage from './pages/MyReservations';
 import ProfilePage from './pages/Profile';
 import RegisterPage from './pages/Register';
 import SearchPage from './pages/Search';
-
-function FullScreenLoader() {
-  return <div className="loading-state">Dang tai du lieu...</div>;
-}
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
   useBootstrapAuth();
@@ -50,10 +48,10 @@ function GuestOnly({ children }: { children: ReactElement }) {
 
 function NotFoundPage() {
   return (
-    <div className="page-stack">
-      <section className="empty-state">
-        <h1>Khong tim thay trang</h1>
-        <p className="page-description">Duong dan ban vua truy cap khong ton tai trong khu vuc ban doc.</p>
+    <div className="flex flex-col gap-6">
+      <section className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-[0_20px_50px_rgba(15,31,56,0.08)]">
+        <h1 className="m-0 text-2xl font-bold text-slate-900">Không tìm thấy trang</h1>
+        <p className="mt-2 text-slate-500">Đường dẫn bạn vừa truy cập không tồn tại trong khu vực bạn đọc.</p>
       </section>
     </div>
   );
@@ -63,57 +61,45 @@ export const router = createBrowserRouter(
   [
     {
       path: '/',
-      element: <ReaderLayout />,
+      element: (
+        <ProtectedRoute>
+          <ReaderLayout />
+        </ProtectedRoute>
+      ),
       children: [
         { index: true, element: <HomePage /> },
         { path: 'search', element: <SearchPage /> },
         { path: 'books/:id', element: <BookDetailPage /> },
+        { path: 'my-loans', element: <MyLoansPage /> },
+        { path: 'my-reservations', element: <MyReservationsPage /> },
+        { path: 'my-fines', element: <MyFinesPage /> },
+        { path: 'profile', element: <ProfilePage /> },
+      ],
+    },
+    {
+      path: '/register',
+      element: <AuthLayout />,
+      children: [
         {
-          path: 'login',
-          element: (
-            <GuestOnly>
-              <LoginPage />
-            </GuestOnly>
-          ),
-        },
-        {
-          path: 'register',
+          index: true,
           element: (
             <GuestOnly>
               <RegisterPage />
             </GuestOnly>
           ),
         },
+      ],
+    },
+    {
+      path: '/login',
+      element: <AuthLayout />,
+      children: [
         {
-          path: 'my-loans',
+          index: true,
           element: (
-            <ProtectedRoute>
-              <MyLoansPage />
-            </ProtectedRoute>
-          ),
-        },
-        {
-          path: 'my-reservations',
-          element: (
-            <ProtectedRoute>
-              <MyReservationsPage />
-            </ProtectedRoute>
-          ),
-        },
-        {
-          path: 'my-fines',
-          element: (
-            <ProtectedRoute>
-              <MyFinesPage />
-            </ProtectedRoute>
-          ),
-        },
-        {
-          path: 'profile',
-          element: (
-            <ProtectedRoute>
-              <ProfilePage />
-            </ProtectedRoute>
+            <GuestOnly>
+              <LoginPage />
+            </GuestOnly>
           ),
         },
       ],

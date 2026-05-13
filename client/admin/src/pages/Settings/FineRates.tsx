@@ -1,8 +1,11 @@
+import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Space, Table, Typography } from 'antd';
+import { Alert, DatePicker, Form, Input, InputNumber, Modal } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 
+import { AdminPanel, AdminStack, primaryActionButtonClass } from '../../components/AdminSurface';
+import { DataTable } from '../../components/DataTable';
 import { fineApi } from '../../services/fine.api';
 import { useNotificationsStore } from '../../store/notifications.store';
 import { formatCurrency, formatDate } from '../../utils/format';
@@ -40,23 +43,20 @@ export default function FineRatesPage() {
   });
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-        <div>
-          <Typography.Title level={2} style={{ marginBottom: 0 }}>
-            Mức phạt
-          </Typography.Title>
-          <Typography.Text type="secondary">Quản lý mức phạt quá hạn theo thời điểm hiệu lực. Chỉ quản trị viên được phép thao tác.</Typography.Text>
-        </div>
-        <Button type="primary" onClick={() => setOpen(true)}>
-          Thêm mức phạt
-        </Button>
-      </Space>
-
+    <AdminStack>
       {query.error ? <Alert type="error" showIcon message={(query.error as Error).message} /> : null}
 
-      <Card>
-        <Table
+      <AdminPanel
+        title="Mức phạt theo thời điểm"
+        description="Theo dõi các mức phạt quá hạn đã được áp dụng trong hệ thống."
+        actions={
+          <button className={primaryActionButtonClass} onClick={() => setOpen(true)} type="button">
+            <PlusOutlined />
+            Thêm mức phạt
+          </button>
+        }
+      >
+        <DataTable
           rowKey="_id"
           loading={query.isLoading}
           pagination={false}
@@ -64,10 +64,10 @@ export default function FineRatesPage() {
           columns={[
             { title: 'Mức phạt / ngày', render: (_, record) => formatCurrency(record.ratePerDay) },
             { title: 'Hiệu lực từ', render: (_, record) => formatDate(record.effectiveFrom) },
-            { title: 'Áp dụng cho', dataIndex: 'appliesTo' },
+            { title: 'Áp dụng cho', dataIndex: 'appliesTo', render: (value) => value || 'Tất cả' },
           ]}
         />
-      </Card>
+      </AdminPanel>
 
       <Modal
         title="Tạo mức phạt"
@@ -90,6 +90,6 @@ export default function FineRatesPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </Space>
+    </AdminStack>
   );
 }

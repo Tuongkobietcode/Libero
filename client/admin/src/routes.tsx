@@ -9,13 +9,17 @@ import DashboardPage from './pages/Dashboard';
 import BookDetailPage from './pages/Catalog/BookDetail';
 import BookFormPage from './pages/Catalog/BookForm';
 import BookListPage from './pages/Catalog/BookList';
+import CategoryListPage from './pages/Catalog/CategoryList';
 import CSVImportPage from './pages/Catalog/CSVImport';
 import CheckoutPage from './pages/Circulation/Checkout';
+import CreateCheckoutPage from './pages/Circulation/CreateCheckout';
 import ReturnPage from './pages/Circulation/Return';
+import BookHoldListPage from './pages/BookHolds/BookHoldList';
 import FineManagerPage from './pages/Fines/FineManager';
 import MemberDetailPage from './pages/Members/MemberDetail';
 import MemberFormPage from './pages/Members/MemberForm';
 import MemberListPage from './pages/Members/MemberList';
+import ReservationListPage from './pages/Reservations/ReservationList';
 import FineStatsPage from './pages/Reports/FineStats';
 import InventoryPage from './pages/Reports/Inventory';
 import LoanStatsPage from './pages/Reports/LoanStats';
@@ -108,6 +112,7 @@ export const router = createBrowserRouter(
       children: [
         { index: true, element: <DashboardPage /> },
         { path: 'catalog', element: <BookListPage /> },
+        { path: 'categories', element: <CategoryListPage /> },
         { path: 'catalog/new', element: <BookFormPage /> },
         { path: 'catalog/import', element: <CSVImportPage /> },
         { path: 'catalog/:id', element: <BookDetailPage /> },
@@ -117,7 +122,10 @@ export const router = createBrowserRouter(
         { path: 'members/:id', element: <MemberDetailPage /> },
         { path: 'members/:id/edit', element: <MemberFormPage /> },
         { path: 'circulation/checkout', element: <CheckoutPage /> },
+        { path: 'circulation/checkout/new', element: <CreateCheckoutPage /> },
         { path: 'circulation/return', element: <ReturnPage /> },
+        { path: 'book-holds', element: <BookHoldListPage /> },
+        { path: 'reservations', element: <ReservationListPage /> },
         { path: 'fines', element: <FineManagerPage /> },
         { path: 'reports/loan-stats', element: <LoanStatsPage /> },
         { path: 'reports/overdue', element: <OverdueListPage /> },

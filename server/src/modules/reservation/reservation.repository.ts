@@ -1,8 +1,9 @@
 import type { ClientSession, FilterQuery, Types } from 'mongoose';
 
-import { CopyStatus, ReservationStatus } from '../../common/types/enums';
+import { BookHoldStatus, CopyStatus, ReservationStatus } from '../../common/types/enums';
 import { BookModel, type BookDocument } from '../../models/Book.model';
 import { BookCopyModel, type BookCopyDocument } from '../../models/BookCopy.model';
+import { BookHoldModel, type BookHoldDocument } from '../../models/BookHold.model';
 import { MemberModel, type MemberDocument } from '../../models/Member.model';
 import { ReservationModel, type Reservation, type ReservationDocument } from '../../models/Reservation.model';
 
@@ -68,6 +69,24 @@ export class ReservationRepository {
         $in: [ReservationStatus.Waiting, ReservationStatus.Notified],
       },
     }).sort({ queuePosition: 1, requestDate: 1 });
+
+    if (session) {
+      query = query.session(session);
+    }
+
+    return query.exec();
+  }
+
+  async findActiveBookHoldForMemberBook(
+    memberId: string | Types.ObjectId,
+    bookId: string | Types.ObjectId,
+    session?: ClientSession,
+  ): Promise<BookHoldDocument | null> {
+    let query = BookHoldModel.findOne({
+      memberId,
+      bookId,
+      status: BookHoldStatus.Active,
+    }).sort({ requestDate: -1 });
 
     if (session) {
       query = query.session(session);
@@ -316,6 +335,29 @@ export class ReservationRepository {
         $in: bookIds,
       },
     }).exec();
+  }
+
+  async countActiveReservationsByBookIds(bookIds: Types.ObjectId[]): Promise<Map<string, number>> {
+    if (bookIds.length === 0) {
+      return new Map();
+    }
+
+    const buckets = await ReservationModel.aggregate<{ _id: Types.ObjectId; count: number }>([
+      {
+        $match: {
+          bookId: { $in: bookIds },
+          status: { $in: [ReservationStatus.Waiting, ReservationStatus.Notified] },
+        },
+      },
+      {
+        $group: {
+          _id: '$bookId',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    return new Map(buckets.map((bucket) => [bucket._id.toString(), bucket.count]));
   }
 
   async findCopiesByIds(copyIds: Types.ObjectId[]): Promise<BookCopyDocument[]> {

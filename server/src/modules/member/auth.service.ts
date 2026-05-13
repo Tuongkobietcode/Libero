@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import { AuthenticationError, BusinessRuleError, ConflictError, RateLimitError } from '../../common/errors/AppError';
 import { ERR } from '../../common/errors/errorCodes';
 import { MemberStatus, Role } from '../../common/types/enums';
+import { invalidateMemberCache } from '../../common/utils/memberCache';
 import { env } from '../../config/env';
 import { assertCanAuthenticateWithMemberStatus } from './authStatus';
 import type {
@@ -72,6 +73,7 @@ export class AuthService {
       role: Role.Student,
       memberCardNo,
       status: MemberStatus.Pending,
+      passwordUpdatedAt: new Date(),
     });
 
     return {
@@ -101,6 +103,8 @@ export class AuthService {
     assertCanAuthenticateWithMemberStatus(member.status);
 
     await this.resetFailedLogin(member.id, normalizedEmail);
+
+    await this.repository.updateMemberById(member.id, { $set: { lastLoginAt: new Date() } });
 
     const tokens = await this.issueTokenPair(member.id, member.role);
 
@@ -139,6 +143,7 @@ export class AuthService {
       assertCanAuthenticateWithMemberStatus(member.status);
     } catch (error) {
       await this.repository.revokeAllRefreshTokensForMember(member.id, new Date());
+      await invalidateMemberCache(member.id);
       throw error;
     }
 
@@ -274,6 +279,10 @@ export class AuthService {
       }
 
       await this.repository.updateMemberById(memberId, update);
+
+      if (attempts >= MAX_FAILED_LOGINS) {
+        await invalidateMemberCache(memberId);
+      }
     }
 
     return attempts >= MAX_FAILED_LOGINS;

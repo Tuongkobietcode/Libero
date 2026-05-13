@@ -235,8 +235,11 @@ describe('Report Phase 7 integration', () => {
     app.use(errorHandler);
 
     try {
-      await mongoose.connect('mongodb://localhost:27017/libero-report-test?replicaSet=rs0');
+      await mongoose.connect('mongodb://localhost:27017/libero-report-test?replicaSet=rs0', {
+        serverSelectionTimeoutMS: 1_000,
+      });
     } catch {
+      await mongoose.disconnect();
       replSet = await MongoMemoryReplSet.create({
         replSet: {
           count: 1,

@@ -1,8 +1,10 @@
 import { DownloadOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Button, Card, Empty, Select, Space, Table, Typography } from 'antd';
+import { Alert, Empty, Select } from 'antd';
 import { useState } from 'react';
 
+import { AdminPanel, AdminStack, AdminToolbar, secondaryButtonClass } from '../../components/AdminSurface';
+import { DataTable } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
 import { reportApi } from '../../services/report.api';
 import { CopyStatus } from '../../types/models';
@@ -27,36 +29,30 @@ export default function InventoryPage() {
   };
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <div>
-        <Typography.Title level={2} style={{ marginBottom: 0 }}>
-          Tình trạng kho
-        </Typography.Title>
-        <Typography.Text type="secondary">Xem số lượng bản sao theo từng đầu sách và trạng thái bản sao.</Typography.Text>
-      </div>
-
-      <Card>
-        <Space wrap>
-          <Select
-            allowClear
-            placeholder="Lọc theo trạng thái"
-            style={{ width: 220 }}
-            value={status}
-            onChange={(value) => setStatus(value)}
-            options={Object.values(CopyStatus).map((value) => ({ label: getStatusLabel(value), value }))}
-          />
-          <Button icon={<DownloadOutlined />} onClick={() => void handleExport('xlsx')}>
-            Xuất XLSX
-          </Button>
-          <Button onClick={() => void handleExport('pdf')}>Xuất PDF</Button>
-        </Space>
-      </Card>
+    <AdminStack>
+      <AdminToolbar>
+        <Select
+          allowClear
+          placeholder="Lọc theo trạng thái"
+          className="min-w-56"
+          value={status}
+          onChange={(value) => setStatus(value)}
+          options={Object.values(CopyStatus).map((value) => ({ label: getStatusLabel(value), value }))}
+        />
+        <button className={secondaryButtonClass} onClick={() => void handleExport('xlsx')} type="button">
+          <DownloadOutlined />
+          Xuất XLSX
+        </button>
+        <button className={secondaryButtonClass} onClick={() => void handleExport('pdf')} type="button">
+          Xuất PDF
+        </button>
+      </AdminToolbar>
 
       {query.error ? <Alert type="error" showIcon message={(query.error as Error).message} /> : null}
 
-      <Card>
+      <AdminPanel title="Tình trạng kho" description="Số lượng bản sao theo từng đầu sách và trạng thái bản sao.">
         {query.data?.length ? (
-          <Table
+          <DataTable
             rowKey={(record) => `${record.book._id}-${record.status}`}
             pagination={false}
             loading={query.isLoading}
@@ -71,7 +67,7 @@ export default function InventoryPage() {
         ) : (
           <Empty description="Không có dữ liệu tình trạng kho." />
         )}
-      </Card>
-    </Space>
+      </AdminPanel>
+    </AdminStack>
   );
 }

@@ -1,9 +1,11 @@
 import { DownloadOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Button, Card, Col, DatePicker, Empty, Row, Space, Table, Typography } from 'antd';
+import { Alert, DatePicker, Empty } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 
+import { AdminPanel, AdminStack, AdminToolbar, secondaryButtonClass } from '../../components/AdminSurface';
+import { DataTable } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
 import { reportApi } from '../../services/report.api';
 import { getStatusLabel } from '../../utils/display';
@@ -32,40 +34,39 @@ export default function FineStatsPage() {
   };
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <div>
-        <Typography.Title level={2} style={{ marginBottom: 0 }}>
-          Thống kê tiền phạt
-        </Typography.Title>
-        <Typography.Text type="secondary">Phân tích nợ chưa thanh toán, tổng tiền theo trạng thái và biến động tiền phạt theo thời gian.</Typography.Text>
-      </div>
-
-      <Card>
-        <Space wrap>
-          <DatePicker.RangePicker value={range as [dayjs.Dayjs, dayjs.Dayjs] | null} onChange={(nextRange) => setRange(nextRange as [dayjs.Dayjs | null, dayjs.Dayjs | null] | null)} />
-          <Button icon={<DownloadOutlined />} onClick={() => void handleExport('xlsx')}>
-            Xuất XLSX
-          </Button>
-          <Button onClick={() => void handleExport('pdf')}>Xuất PDF</Button>
-        </Space>
-      </Card>
+    <AdminStack>
+      <AdminToolbar>
+        <DatePicker.RangePicker
+          value={range as [dayjs.Dayjs, dayjs.Dayjs] | null}
+          onChange={(nextRange) => setRange(nextRange as [dayjs.Dayjs | null, dayjs.Dayjs | null] | null)}
+        />
+        <button className={secondaryButtonClass} onClick={() => void handleExport('xlsx')} type="button">
+          <DownloadOutlined />
+          Xuất XLSX
+        </button>
+        <button className={secondaryButtonClass} onClick={() => void handleExport('pdf')} type="button">
+          Xuất PDF
+        </button>
+      </AdminToolbar>
 
       {query.error ? <Alert type="error" showIcon message={(query.error as Error).message} /> : null}
 
-      <Row gutter={[16, 16]}>
+      <div className="grid gap-5 md:grid-cols-3">
         {(query.data?.summary ?? []).map((item) => (
-          <Col xs={24} md={8} key={item.status}>
-            <Card title={getStatusLabel(item.status)}>
-              <Typography.Title level={4}>{formatCurrency(item.totalAmount)}</Typography.Title>
-              <Typography.Text type="secondary">{item.count} bản ghi</Typography.Text>
-            </Card>
-          </Col>
+          <section
+            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.04)]"
+            key={item.status}
+          >
+            <p className="m-0 text-sm font-extrabold text-slate-500">{getStatusLabel(item.status)}</p>
+            <p className="m-0 mt-3 text-3xl font-black text-slate-950">{formatCurrency(item.totalAmount)}</p>
+            <p className="m-0 mt-2 text-sm font-semibold text-slate-500">{item.count} bản ghi</p>
+          </section>
         ))}
-      </Row>
+      </div>
 
-      <Card title="Xu hướng">
+      <AdminPanel title="Xu hướng" description="Tổng tiền phạt và số bản ghi theo kỳ.">
         {query.data?.trend.length ? (
-          <Table
+          <DataTable
             rowKey="period"
             pagination={false}
             dataSource={query.data.trend}
@@ -78,11 +79,11 @@ export default function FineStatsPage() {
         ) : (
           <Empty description="Không có dữ liệu xu hướng." />
         )}
-      </Card>
+      </AdminPanel>
 
-      <Card title="Công nợ thành viên">
+      <AdminPanel title="Công nợ thành viên" description="Các độc giả còn khoản phạt chưa thanh toán.">
         {query.data?.memberDebts.length ? (
-          <Table
+          <DataTable
             rowKey={(record) => record.member._id}
             pagination={false}
             dataSource={query.data.memberDebts}
@@ -96,7 +97,7 @@ export default function FineStatsPage() {
         ) : (
           <Empty description="Không có dữ liệu công nợ thành viên." />
         )}
-      </Card>
-    </Space>
+      </AdminPanel>
+    </AdminStack>
   );
 }

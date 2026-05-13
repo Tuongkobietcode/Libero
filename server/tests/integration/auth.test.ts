@@ -228,8 +228,11 @@ describe('Auth integration', () => {
     app.use(errorHandler);
 
     try {
-      await mongoose.connect('mongodb://localhost:27017/libero-auth-test?replicaSet=rs0');
+      await mongoose.connect('mongodb://localhost:27017/libero-auth-test?replicaSet=rs0', {
+        serverSelectionTimeoutMS: 1_000,
+      });
     } catch {
+      await mongoose.disconnect();
       replSet = await MongoMemoryReplSet.create({
         replSet: {
           count: 1,
@@ -287,6 +290,37 @@ describe('Auth integration', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.accessToken).toBeTruthy();
     expect(response.headers['set-cookie'][0]).toContain('refreshToken=');
+  });
+
+  it('uses app-specific refresh cookies when a client app is declared', async () => {
+    await createActiveMember();
+
+    const response = await request(app)
+      .post('/api/v1/auth/login')
+      .set('X-Client-App', 'reader')
+      .send({ email: 'reader@example.com', password: 'Password1' })
+      .expect(200);
+
+    expect(response.headers['set-cookie'][0]).toContain('reader_refreshToken=');
+  });
+
+  it('does not use the legacy refresh cookie for declared client apps', async () => {
+    await createActiveMember();
+
+    const legacyLoginResponse = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'reader@example.com', password: 'Password1' })
+      .expect(200);
+
+    const legacyCookie = legacyLoginResponse.headers['set-cookie'][0];
+
+    const response = await request(app)
+      .post('/api/v1/auth/refresh')
+      .set('X-Client-App', 'reader')
+      .set('Cookie', legacyCookie)
+      .expect(401);
+
+    expect(response.body.error.code).toBe(ERR.AUTH_REFRESH_INVALID);
   });
 
   it('returns 401 for wrong password', async () => {
@@ -427,5 +461,29 @@ describe('Auth integration', () => {
 
     const member = await MemberModel.findOne({ email: 'new-reader@example.com' }).exec();
     expect(member?.status).toBe(MemberStatus.Pending);
+  });
+
+  it('rate limits register requests after five attempts from the same IP', async () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await request(app)
+        .post('/api/v1/auth/register')
+        .send({
+          fullName: 'A',
+          email: 'not-an-email',
+          password: 'short',
+        })
+        .expect(400);
+    }
+
+    const response = await request(app)
+      .post('/api/v1/auth/register')
+      .send({
+        fullName: 'A',
+        email: 'not-an-email',
+        password: 'short',
+      })
+      .expect(429);
+
+    expect(response.body.error.code).toBe(ERR.COMMON_RATE_LIMITED);
   });
 });

@@ -25,12 +25,15 @@ import type {
   BookDetail,
   BookListItem,
   BookNameRef,
+  CategoryListItem,
   CreateBookDto,
+  CreateCategoryDto,
   CsvImportErrorDetail,
   CsvImportResult,
   RequestActor,
   SearchBooksQuery,
   UpdateBookDto,
+  UpdateCategoryDto,
   UpdateCopyStatusDto,
 } from './catalog.types';
 
@@ -415,6 +418,136 @@ export class CatalogService {
     return result;
   }
 
+  async listCategories(): Promise<CategoryListItem[]> {
+    const [categories, categoryCounts] = await Promise.all([
+      this.repository.listCategories(),
+      this.repository.aggregateCategoryFacets(),
+    ]);
+    const countMap = new Map(categoryCounts.map((entry) => [entry._id.toString(), entry.count]));
+
+    return categories.map((category) => {
+      const count = countMap.get(category.id) ?? 0;
+
+      return {
+        _id: category.id,
+        name: category.name,
+        count,
+        canDelete: count === 0,
+      };
+    });
+  }
+
+  async createCategory(input: CreateCategoryDto, actor?: RequestActor): Promise<CategoryListItem> {
+    const existingCategory = await this.repository.findCategoryByName(input.name);
+
+    if (existingCategory) {
+      throw new ConflictError(ERR.COMMON_BAD_REQUEST, 409, 'Category name already exists');
+    }
+
+    let createdCategory: CategoryDocument;
+
+    try {
+      createdCategory = await this.repository.createCategoryRecord(input.name);
+    } catch (error) {
+      if (!isDuplicateKeyError(error)) {
+        throw error;
+      }
+
+      throw new ConflictError(ERR.COMMON_BAD_REQUEST, 409, 'Category name already exists');
+    }
+
+    const result = {
+      _id: createdCategory.id,
+      name: createdCategory.name,
+      count: 0,
+      canDelete: true,
+    };
+
+    this.writeAudit(actor, 'CREATE_CATEGORY', 'Category', createdCategory.id, undefined, result);
+
+    return result;
+  }
+
+  async updateCategory(categoryId: string, input: UpdateCategoryDto, actor?: RequestActor): Promise<CategoryListItem> {
+    const currentCategory = await this.repository.findCategoryById(categoryId);
+
+    if (!currentCategory) {
+      throw new NotFoundError(ERR.COMMON_NOT_FOUND, 404, 'Category not found');
+    }
+
+    if (input.name && input.name !== currentCategory.name) {
+      const existingCategory = await this.repository.findCategoryByName(input.name);
+
+      if (existingCategory && existingCategory.id !== currentCategory.id) {
+        throw new ConflictError(ERR.COMMON_BAD_REQUEST, 409, 'Category name already exists');
+      }
+    }
+
+    const updatedCategory = await this.repository.updateCategoryById(currentCategory.id, {
+      $set: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+      },
+    });
+
+    if (!updatedCategory) {
+      throw new NotFoundError(ERR.COMMON_NOT_FOUND, 404, 'Category not found');
+    }
+
+    const count = await this.repository.countBooksByCategoryId(updatedCategory.id);
+    const result = {
+      _id: updatedCategory.id,
+      name: updatedCategory.name,
+      count,
+      canDelete: count === 0,
+    };
+
+    this.writeAudit(
+      actor,
+      'UPDATE_CATEGORY',
+      'Category',
+      updatedCategory.id,
+      { _id: currentCategory.id, name: currentCategory.name },
+      result,
+    );
+
+    return result;
+  }
+
+  async deleteCategory(categoryId: string, actor?: RequestActor): Promise<{ categoryId: string; deleted: true }> {
+    const currentCategory = await this.repository.findCategoryById(categoryId);
+
+    if (!currentCategory) {
+      throw new NotFoundError(ERR.COMMON_NOT_FOUND, 404, 'Category not found');
+    }
+
+    const bookCount = await this.repository.countBooksByCategoryId(currentCategory.id);
+
+    if (bookCount > 0) {
+      throw new BusinessRuleError(
+        ERR.COMMON_BAD_REQUEST,
+        422,
+        'Cannot delete a category that is used by books',
+        { bookCount },
+      );
+    }
+
+    await this.repository.deleteCategoryById(currentCategory.id);
+
+    this.writeAudit(
+      actor,
+      'DELETE_CATEGORY',
+      'Category',
+      currentCategory.id,
+      { _id: currentCategory.id, name: currentCategory.name },
+      { deleted: true },
+    );
+
+    return {
+      categoryId: currentCategory.id,
+      deleted: true,
+    };
+  }
+
   async importCsv(buffer: Buffer, actor?: RequestActor): Promise<CsvImportResult> {
     const rows = await parseCsvBuffer(buffer);
     const errors: CsvImportErrorDetail[] = [];
@@ -636,6 +769,9 @@ export class CatalogService {
       publishYear: book.publishYear,
       description: book.description,
       coverImage: book.coverImage,
+      language: book.language,
+      pageCount: book.pageCount,
+      bookSize: book.bookSize,
       totalCopies: copyCount.totalCopies,
       availableCopies: copyCount.availableCopies,
       createdAt: book.createdAt,
@@ -708,6 +844,99 @@ export class CatalogService {
       ipAddress: actor?.ipAddress,
       userAgent: actor?.userAgent,
     });
+  }
+
+  async getFacets(): Promise<import('./catalog.types').CatalogFacets> {
+    const [categoryCounts, publishYear, availableCount, borrowingCount] = await Promise.all([
+      this.repository.aggregateCategoryFacets(),
+      this.repository.aggregatePublishYearRange(),
+      this.repository.countBooksWithAvailableCopies(),
+      this.repository.countBooksWithStatus(CopyStatus.Borrowed),
+    ]);
+
+    const categoryIds = categoryCounts.map((entry) => entry._id);
+    const categoryMap = await this.buildCategoryMap(categoryIds);
+    const categories = categoryCounts
+      .map((entry) => {
+        const ref = categoryMap.get(entry._id.toString());
+        if (!ref) {
+          return null;
+        }
+        return { _id: ref._id, name: ref.name, count: entry.count };
+      })
+      .filter((value): value is { _id: string; name: string; count: number } => value !== null)
+      .sort((a, b) => b.count - a.count);
+
+    return {
+      categories,
+      statuses: {
+        available: availableCount,
+        borrowing: borrowingCount,
+        soon: 0,
+      },
+      publishYear,
+    };
+  }
+
+  async getPopularBooks(params: { limit?: number; windowDays?: number }): Promise<BookListItem[]> {
+    const limit = params.limit ?? 10;
+    const windowDays = params.windowDays ?? 30;
+    const popularIds = await this.repository.aggregatePopularBookIds(windowDays, limit);
+
+    if (popularIds.length === 0) {
+      return [];
+    }
+
+    const books = await this.repository.findBooksByIds(popularIds);
+    const orderIndex = new Map(popularIds.map((id, index) => [id.toString(), index]));
+    books.sort((a, b) => (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0));
+
+    const [authorMap, categoryMap, copyCountMap] = await Promise.all([
+      this.buildAuthorMap(this.collectObjectIds(books.flatMap((book) => book.authorIds))),
+      this.buildCategoryMap(this.collectObjectIds(books.flatMap((book) => book.categoryIds))),
+      this.buildCopyCountMap(books.map((book) => book._id)),
+    ]);
+
+    return books.map((book) =>
+      this.toBookListItem(
+        book,
+        authorMap,
+        categoryMap,
+        copyCountMap.get(book.id) ?? { totalCopies: 0, availableCopies: 0 },
+      ),
+    );
+  }
+
+  async getRecommendations(memberId: string, limit: number = 10): Promise<BookListItem[]> {
+    const [topCategories, excludeIds] = await Promise.all([
+      this.repository.findTopCategoriesForMember(memberId, 5),
+      this.repository.findActiveLoanedBookIdsByMember(memberId),
+    ]);
+
+    if (topCategories.length === 0) {
+      return [];
+    }
+
+    const books = await this.repository.findRecommendedBooks(topCategories, excludeIds, limit);
+
+    if (books.length === 0) {
+      return [];
+    }
+
+    const [authorMap, categoryMap, copyCountMap] = await Promise.all([
+      this.buildAuthorMap(this.collectObjectIds(books.flatMap((book) => book.authorIds))),
+      this.buildCategoryMap(this.collectObjectIds(books.flatMap((book) => book.categoryIds))),
+      this.buildCopyCountMap(books.map((book) => book._id)),
+    ]);
+
+    return books.map((book) =>
+      this.toBookListItem(
+        book,
+        authorMap,
+        categoryMap,
+        copyCountMap.get(book.id) ?? { totalCopies: 0, availableCopies: 0 },
+      ),
+    );
   }
 }
 

@@ -2,6 +2,7 @@ import type { ClientSession, Types } from 'mongoose';
 
 import { NotFoundError } from '../errors/AppError';
 import { ERR } from '../errors/errorCodes';
+import { invalidateMemberCache } from './memberCache';
 import { env } from '../../config/env';
 
 export interface MemberBlockRepository {
@@ -40,6 +41,7 @@ export async function recalculateMemberBlock(
 
   if (member.isBlocked !== shouldBeBlocked) {
     await repository.updateMemberBlockedStatus(memberId, shouldBeBlocked, session);
+    await invalidateMemberCache(memberId);
   }
 
   return {

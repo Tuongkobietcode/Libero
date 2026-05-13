@@ -1,6 +1,6 @@
 import type { ApiEnvelope, PaginatedResult } from '../types/api';
 import type { LoanPolicyView, MemberStatus, MemberView, Role } from '../types/models';
-import { apiClient, unwrapResponse } from './api';
+import { apiClient, authClient, unwrapResponse } from './api';
 
 export interface MemberListParams {
   q?: string;
@@ -23,8 +23,10 @@ export interface MemberFormPayload {
 }
 
 export const memberApi = {
-  async getMe(): Promise<MemberView> {
-    const response = await apiClient.get<ApiEnvelope<MemberView>>('/members/me');
+  async getMe(accessToken?: string): Promise<MemberView> {
+    const response = await (accessToken ? authClient : apiClient).get<ApiEnvelope<MemberView>>('/members/me', {
+      ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
+    });
     return unwrapResponse(response.data);
   },
   async listMembers(params: MemberListParams): Promise<PaginatedResult<MemberView>> {

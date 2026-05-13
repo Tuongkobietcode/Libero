@@ -1,5 +1,5 @@
 import type { ApiEnvelope, PaginatedResult } from '../types/api';
-import type { BookDetail, BookListItem, CopyStatus, CsvImportResult } from '../types/models';
+import type { BookDetail, BookListItem, CatalogFacets, CategoryListItem, CopyStatus, CsvImportResult } from '../types/models';
 import { apiClient, unwrapResponse } from './api';
 
 export interface BookListParams {
@@ -25,9 +25,33 @@ export interface BookFormPayload {
   acquiredDate?: string;
 }
 
+export interface CategoryPayload {
+  name: string;
+}
+
 export const catalogApi = {
   async listBooks(params: BookListParams): Promise<PaginatedResult<BookListItem>> {
     const response = await apiClient.get<ApiEnvelope<PaginatedResult<BookListItem>>>('/books', { params });
+    return unwrapResponse(response.data);
+  },
+  async getFacets(): Promise<CatalogFacets> {
+    const response = await apiClient.get<ApiEnvelope<CatalogFacets>>('/books/facets');
+    return unwrapResponse(response.data);
+  },
+  async listCategories(): Promise<CategoryListItem[]> {
+    const response = await apiClient.get<ApiEnvelope<CategoryListItem[]>>('/books/categories');
+    return unwrapResponse(response.data);
+  },
+  async createCategory(payload: CategoryPayload): Promise<CategoryListItem> {
+    const response = await apiClient.post<ApiEnvelope<CategoryListItem>>('/books/categories', payload);
+    return unwrapResponse(response.data);
+  },
+  async updateCategory(categoryId: string, payload: CategoryPayload): Promise<CategoryListItem> {
+    const response = await apiClient.patch<ApiEnvelope<CategoryListItem>>(`/books/categories/${categoryId}`, payload);
+    return unwrapResponse(response.data);
+  },
+  async deleteCategory(categoryId: string): Promise<{ categoryId: string; deleted: true }> {
+    const response = await apiClient.delete<ApiEnvelope<{ categoryId: string; deleted: true }>>(`/books/categories/${categoryId}`);
     return unwrapResponse(response.data);
   },
   async getBook(bookId: string): Promise<BookDetail> {

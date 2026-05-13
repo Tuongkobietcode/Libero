@@ -7,12 +7,15 @@ import {
   NotFoundError,
 } from '../../common/errors/AppError';
 import { ERR } from '../../common/errors/errorCodes';
-import { MemberStatus, Role } from '../../common/types/enums';
+import { FineStatus, LoanStatus, MemberStatus, ReservationStatus, Role } from '../../common/types/enums';
 import { writeAuditLog } from '../../common/utils/auditLogger';
-import { buildMemberCacheKey } from '../../common/utils/memberCache';
+import { invalidateMemberCache } from '../../common/utils/memberCache';
 import { buildPagination, buildPaginationResult } from '../../common/utils/pagination';
 import { logger } from '../../common/middleware/requestLogger';
-import { getRedisClient } from '../../config/redis';
+import { BookModel } from '../../models/Book.model';
+import { FineRecordModel } from '../../models/FineRecord.model';
+import { LoanRecordModel } from '../../models/LoanRecord.model';
+import { ReservationModel } from '../../models/Reservation.model';
 import { notificationService } from '../notification/notification.service';
 import type { MemberAuthDocument } from './auth.types';
 import { memberRepository, type MemberRepository } from './member.repository';
@@ -22,6 +25,8 @@ import type {
   LoanPolicyRole,
   LoanPolicyUpdateDto,
   LoanPolicyView,
+  MemberActivityItem,
+  MemberStatsView,
   MemberView,
   RequestActor,
   SuspendMemberDto,
@@ -46,6 +51,13 @@ function toMemberView(member: MemberAuthDocument): MemberView {
     lockedUntil: member.lockedUntil,
     joinDate: member.joinDate,
     expiryDate: member.expiryDate,
+    faculty: member.faculty,
+    className: member.className,
+    campus: member.campus,
+    libraryBranch: member.libraryBranch,
+    membershipTier: member.membershipTier,
+    lastLoginAt: member.lastLoginAt,
+    passwordUpdatedAt: member.passwordUpdatedAt,
     createdAt: member.createdAt,
     updatedAt: member.updatedAt,
   };
@@ -96,6 +108,12 @@ export class MemberService {
       status: MemberStatus.Active,
       joinDate: input.joinDate,
       expiryDate: input.expiryDate,
+      faculty: input.faculty,
+      className: input.className,
+      campus: input.campus,
+      libraryBranch: input.libraryBranch,
+      membershipTier: input.membershipTier,
+      passwordUpdatedAt: new Date(),
       isBlocked: false,
       failedLoginCount: 0,
       lockedUntil: null,
@@ -119,6 +137,134 @@ export class MemberService {
 
   async getCurrentMember(memberId: string): Promise<MemberView> {
     return this.getMemberById(memberId);
+  }
+
+  async getMyStats(memberId: string): Promise<MemberStatsView> {
+    const memberObjectId = new mongoose.Types.ObjectId(memberId);
+
+    const [activeLoans, overdueLoans, completedLoans, activeReservations, fineAggregate] = await Promise.all([
+      LoanRecordModel.countDocuments({ memberId: memberObjectId, status: LoanStatus.Active }).exec(),
+      LoanRecordModel.countDocuments({ memberId: memberObjectId, status: LoanStatus.Overdue }).exec(),
+      LoanRecordModel.countDocuments({ memberId: memberObjectId, status: LoanStatus.Returned }).exec(),
+      ReservationModel.countDocuments({
+        memberId: memberObjectId,
+        status: { $in: [ReservationStatus.Waiting, ReservationStatus.Notified] },
+      }).exec(),
+      FineRecordModel.aggregate<{ _id: null; total: number; count: number }>([
+        { $match: { memberId: memberObjectId, status: FineStatus.Unpaid } },
+        { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
+      ]).exec(),
+    ]);
+
+    const fineSummary = fineAggregate[0];
+
+    return {
+      activeLoans,
+      overdueLoans,
+      completedLoans,
+      activeReservations,
+      unpaidFineTotal: fineSummary?.total ?? 0,
+      unpaidFineCount: fineSummary?.count ?? 0,
+    };
+  }
+
+  async getMyActivities(memberId: string, limit = 10): Promise<MemberActivityItem[]> {
+    const memberObjectId = new mongoose.Types.ObjectId(memberId);
+    const perSourceLimit = Math.min(limit, 20);
+
+    const [loans, reservations, paidFines] = await Promise.all([
+      LoanRecordModel.find({ memberId: memberObjectId })
+        .sort({ updatedAt: -1 })
+        .limit(perSourceLimit)
+        .select({ _id: 1, bookId: 1, status: 1, checkoutDate: 1, returnDate: 1, updatedAt: 1, createdAt: 1 })
+        .lean()
+        .exec(),
+      ReservationModel.find({ memberId: memberObjectId })
+        .sort({ updatedAt: -1 })
+        .limit(perSourceLimit)
+        .select({ _id: 1, bookId: 1, status: 1, requestDate: 1, updatedAt: 1, createdAt: 1 })
+        .lean()
+        .exec(),
+      FineRecordModel.find({ memberId: memberObjectId, status: FineStatus.Paid })
+        .sort({ paidAt: -1 })
+        .limit(perSourceLimit)
+        .select({ _id: 1, amount: 1, paidAt: 1, createdAt: 1 })
+        .lean()
+        .exec(),
+    ]);
+
+    const bookIdSet = new Set<string>();
+    loans.forEach((loan) => bookIdSet.add(loan.bookId.toString()));
+    reservations.forEach((reservation) => bookIdSet.add(reservation.bookId.toString()));
+
+    const bookDocs = bookIdSet.size > 0
+      ? await BookModel.find({ _id: { $in: Array.from(bookIdSet) } })
+          .select({ _id: 1, title: 1 })
+          .lean()
+          .exec()
+      : [];
+    const bookTitleById = new Map<string, string>();
+    bookDocs.forEach((book) => bookTitleById.set(book._id.toString(), book.title));
+
+    const activities: MemberActivityItem[] = [];
+
+    for (const loan of loans) {
+      const title = bookTitleById.get(loan.bookId.toString()) ?? 'Sách';
+      if (loan.returnDate) {
+        activities.push({
+          id: `loan-return-${loan._id.toString()}`,
+          kind: 'LOAN_RETURNED',
+          title: 'Đã trả sách',
+          description: title,
+          occurredAt: loan.returnDate,
+        });
+      }
+      activities.push({
+        id: `loan-checkout-${loan._id.toString()}`,
+        kind: 'LOAN_CHECKOUT',
+        title: 'Đã mượn sách',
+        description: title,
+        occurredAt: loan.checkoutDate,
+      });
+    }
+
+    for (const reservation of reservations) {
+      const title = bookTitleById.get(reservation.bookId.toString()) ?? 'Sách';
+      if (reservation.status === ReservationStatus.Cancelled) {
+        activities.push({
+          id: `reservation-cancel-${reservation._id.toString()}`,
+          kind: 'RESERVATION_CANCELLED',
+          title: 'Đã huỷ đặt chỗ',
+          description: title,
+          occurredAt: reservation.updatedAt,
+        });
+      } else {
+        activities.push({
+          id: `reservation-create-${reservation._id.toString()}`,
+          kind: 'RESERVATION_CREATED',
+          title: 'Đã đặt chỗ sách',
+          description: title,
+          occurredAt: reservation.requestDate ?? reservation.createdAt,
+        });
+      }
+    }
+
+    for (const fine of paidFines) {
+      if (!fine.paidAt) {
+        continue;
+      }
+      activities.push({
+        id: `fine-paid-${fine._id.toString()}`,
+        kind: 'FINE_PAID',
+        title: 'Đã thanh toán tiền phạt',
+        description: `${new Intl.NumberFormat('vi-VN').format(fine.amount)}đ`,
+        occurredAt: fine.paidAt,
+      });
+    }
+
+    return activities
+      .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+      .slice(0, limit);
   }
 
   async listMembers(query: ListMembersQuery) {
@@ -189,6 +335,11 @@ export class MemberService {
         ...(input.role !== undefined ? { role: input.role } : {}),
         ...(input.joinDate !== undefined ? { joinDate: input.joinDate } : {}),
         ...(input.expiryDate !== undefined ? { expiryDate: input.expiryDate } : {}),
+        ...(input.faculty !== undefined ? { faculty: input.faculty } : {}),
+        ...(input.className !== undefined ? { className: input.className } : {}),
+        ...(input.campus !== undefined ? { campus: input.campus } : {}),
+        ...(input.libraryBranch !== undefined ? { libraryBranch: input.libraryBranch } : {}),
+        ...(input.membershipTier !== undefined ? { membershipTier: input.membershipTier } : {}),
       },
     });
 
@@ -196,7 +347,9 @@ export class MemberService {
       throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
     }
 
-    await this.invalidateMemberCache(memberId);
+    if (input.role !== undefined && input.role !== currentMember.role) {
+      await invalidateMemberCache(memberId);
+    }
 
     const before = toMemberView(currentMember);
     const after = toMemberView(updatedMember);
@@ -242,7 +395,7 @@ export class MemberService {
       throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
     }
 
-    await this.invalidateMemberCache(currentMember.id);
+    await invalidateMemberCache(currentMember.id);
 
     this.writeAudit(
       actor,
@@ -290,7 +443,7 @@ export class MemberService {
       throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
     }
 
-    await this.invalidateMemberCache(memberId);
+    await invalidateMemberCache(memberId);
 
     this.writeAudit(
       actor,
@@ -342,14 +495,6 @@ export class MemberService {
     this.writeAudit(actor, 'UPDATE_LOAN_POLICY', 'LoanPolicy', updatedPolicy.id, before, after);
 
     return after;
-  }
-
-  private async invalidateMemberCache(memberId: string): Promise<void> {
-    try {
-      await getRedisClient().del(buildMemberCacheKey(memberId));
-    } catch {
-      return;
-    }
   }
 
   private async enqueueAccountBlockedNotification(memberId: string, reason: string): Promise<void> {

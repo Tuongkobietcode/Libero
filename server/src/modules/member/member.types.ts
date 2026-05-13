@@ -17,6 +17,11 @@ export interface CreateManagedMemberDto {
   role: Role;
   joinDate?: Date;
   expiryDate?: Date;
+  faculty?: string;
+  className?: string;
+  campus?: string;
+  libraryBranch?: string;
+  membershipTier?: string;
 }
 
 export interface UpdateManagedMemberDto {
@@ -27,6 +32,11 @@ export interface UpdateManagedMemberDto {
   role?: Role;
   joinDate?: Date;
   expiryDate?: Date;
+  faculty?: string;
+  className?: string;
+  campus?: string;
+  libraryBranch?: string;
+  membershipTier?: string;
 }
 
 export interface ListMembersQuery {
@@ -64,8 +74,39 @@ export interface MemberView {
   lockedUntil?: Date | null;
   joinDate?: Date;
   expiryDate?: Date;
+  faculty?: string;
+  className?: string;
+  campus?: string;
+  libraryBranch?: string;
+  membershipTier?: string;
+  lastLoginAt?: Date | null;
+  passwordUpdatedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface MemberStatsView {
+  activeLoans: number;
+  overdueLoans: number;
+  completedLoans: number;
+  activeReservations: number;
+  unpaidFineTotal: number;
+  unpaidFineCount: number;
+}
+
+export type MemberActivityKind =
+  | 'LOAN_CHECKOUT'
+  | 'LOAN_RETURNED'
+  | 'RESERVATION_CREATED'
+  | 'RESERVATION_CANCELLED'
+  | 'FINE_PAID';
+
+export interface MemberActivityItem {
+  id: string;
+  kind: MemberActivityKind;
+  title: string;
+  description: string;
+  occurredAt: Date;
 }
 
 export interface LoanPolicyView {

@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "workspaces": [
     "server",
+    "shared",
     "client/*"
   ],
   "scripts": {
@@ -24,5 +25,9 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.4",
+    "tailwindcss": "^4.2.4"
   }
 }

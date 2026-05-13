@@ -1,7 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
-import { Alert, Card, Descriptions, Divider, List, Space, Typography } from 'antd';
+import { Alert, Descriptions, Divider, Empty, List } from 'antd';
 import { useState } from 'react';
 
+import { AdminPanel, AdminStack } from '../../components/AdminSurface';
 import { BarcodeInput } from '../../components/BarcodeInput';
 import { StatusBadge } from '../../components/StatusBadge';
 import { loanApi } from '../../services/loan.api';
@@ -30,24 +31,15 @@ export default function ReturnPage() {
   const unpaidTotal = (result?.fines ?? []).filter((fine) => fine.status === 'UNPAID').reduce((sum, fine) => sum + fine.amount, 0);
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <div>
-        <Typography.Title level={2} style={{ marginBottom: 0 }}>
-          Trả sách
-        </Typography.Title>
-        <Typography.Text type="secondary">
-          Quét mã vạch bản sao để xử lý trả sách. Kết quả phiếu mượn và tiền phạt sẽ hiển thị ngay sau khi xác nhận.
-        </Typography.Text>
-      </div>
-
+    <AdminStack>
       <Alert
         type="info"
         showIcon
-        message="Lưu ý về luồng trả sách"
-        description="API backend hiện xử lý trả sách trực tiếp từ mã vạch, nên thông tin phiếu mượn chỉ hiển thị sau khi xác nhận trả."
+        message="Quét barcode để xử lý trả sách"
+        description="Thông tin khoản mượn và tiền phạt sẽ hiển thị ngay sau khi hệ thống ghi nhận trả sách."
       />
 
-      <Card>
+      <AdminPanel title="Barcode bản sao">
         <BarcodeInput
           label="Mã vạch bản sao"
           placeholder="Nhập hoặc quét mã vạch"
@@ -62,15 +54,15 @@ export default function ReturnPage() {
           <Alert
             type="error"
             showIcon
-            style={{ marginTop: 16 }}
+            className="mt-4"
             message={extractErrorMessage(returnMutation.error, 'Trả sách thất bại')}
           />
         ) : null}
-      </Card>
+      </AdminPanel>
 
-      <Card title="Phiếu mượn đã xử lý">
+      <AdminPanel title="Phiếu mượn đã xử lý">
         {result ? (
-          <Space direction="vertical" style={{ width: '100%' }}>
+          <div className="space-y-4">
             <Descriptions bordered column={2}>
               <Descriptions.Item label="Thành viên">{result.member.fullName}</Descriptions.Item>
               <Descriptions.Item label="Sách">{result.book.title}</Descriptions.Item>
@@ -83,8 +75,8 @@ export default function ReturnPage() {
               <Descriptions.Item label="Ngày trả">{formatDateTime(result.returnDate)}</Descriptions.Item>
               <Descriptions.Item label="Phạt chưa thanh toán">{formatCurrency(unpaidTotal, '0')}</Descriptions.Item>
             </Descriptions>
-            <Divider style={{ marginBlock: 8 }} />
-            <Typography.Text strong>Chi tiết tiền phạt</Typography.Text>
+            <Divider className="!my-2" />
+            <p className="m-0 text-sm font-extrabold text-slate-800">Chi tiết tiền phạt</p>
             {result.fines.length ? (
               <List
                 size="small"
@@ -100,13 +92,13 @@ export default function ReturnPage() {
                 )}
               />
             ) : (
-              <Typography.Text type="secondary">Không phát sinh khoản phạt nào cho lần trả này.</Typography.Text>
+              <p className="m-0 text-sm font-semibold text-slate-500">Không phát sinh khoản phạt nào cho lần trả này.</p>
             )}
-          </Space>
+          </div>
         ) : (
-          <Typography.Text type="secondary">Chưa có giao dịch trả nào trong phiên này.</Typography.Text>
+          <Empty description="Chưa có giao dịch trả nào trong phiên này." />
         )}
-      </Card>
-    </Space>
+      </AdminPanel>
+    </AdminStack>
   );
 }

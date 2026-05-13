@@ -13,6 +13,10 @@ export const createReservationSchema = z.object({
   bookId: z.string().regex(objectIdPattern, 'Invalid book id'),
 });
 
+export const createReservationForMemberSchema = createReservationSchema.extend({
+  memberId: z.string().regex(objectIdPattern, 'Invalid member id'),
+});
+
 export const myReservationsQuerySchema = z.object({
   scope: scopeSchema.optional(),
   status: z.nativeEnum(ReservationStatus).optional(),

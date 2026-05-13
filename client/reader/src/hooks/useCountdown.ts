@@ -12,7 +12,7 @@ function getRemainingMs(target?: string | null): number {
 
 function formatRemaining(ms: number): string {
   if (ms <= 0) {
-    return 'Da het han';
+    return 'Đã hết hạn';
   }
 
   const totalSeconds = Math.floor(ms / 1000);
@@ -22,10 +22,10 @@ function formatRemaining(ms: number): string {
   if (hours >= 24) {
     const days = Math.floor(hours / 24);
     const remainHours = hours % 24;
-    return `${days} ngay ${remainHours} gio`;
+    return `${days} ngày ${remainHours} giờ`;
   }
 
-  return `${hours} gio ${minutes} phut`;
+  return `${hours} giờ ${minutes} phút`;
 }
 
 export function useCountdown(target?: string | null) {

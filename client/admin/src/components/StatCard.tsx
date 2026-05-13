@@ -1,4 +1,4 @@
-import { Card, Skeleton, Statistic, Typography } from 'antd';
+import { Skeleton, Statistic, Typography } from 'antd';
 import type { ReactNode } from 'react';
 
 interface StatCardProps {
@@ -11,7 +11,7 @@ interface StatCardProps {
 
 export function StatCard({ title, value, suffix, description, loading }: StatCardProps) {
   return (
-    <Card>
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.04)]">
       {loading ? (
         <Skeleton active paragraph={{ rows: 2 }} />
       ) : (
@@ -24,6 +24,6 @@ export function StatCard({ title, value, suffix, description, loading }: StatCar
           ) : null}
         </>
       )}
-    </Card>
+    </section>
   );
 }

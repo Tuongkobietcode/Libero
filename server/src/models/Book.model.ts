@@ -10,6 +10,9 @@ export interface Book {
   publishYear?: number;
   description?: string;
   coverImage?: string;
+  language?: string;
+  pageCount?: number;
+  bookSize?: string;
   isDeleted: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -69,6 +72,18 @@ const bookSchema = new Schema<Book, BookModelType>(
       type: String,
       trim: true,
     },
+    language: {
+      type: String,
+      trim: true,
+    },
+    pageCount: {
+      type: Number,
+      min: 0,
+    },
+    bookSize: {
+      type: String,
+      trim: true,
+    },
     isDeleted: {
       type: Boolean,
       default: false,
@@ -81,7 +96,14 @@ const bookSchema = new Schema<Book, BookModelType>(
   },
 );
 
-bookSchema.index({ title: 'text', isbn: 'text' }, { weights: { title: 10, isbn: 5 } });
+bookSchema.index(
+  { title: 'text', isbn: 'text' },
+  {
+    weights: { title: 10, isbn: 5 },
+    default_language: 'none',
+    language_override: 'textSearchLanguage',
+  },
+);
 bookSchema.index({ isDeleted: 1, createdAt: -1 });
 
 export const BookModel = (models.Book as BookModelType | undefined) ?? model<Book, BookModelType>('Book', bookSchema);

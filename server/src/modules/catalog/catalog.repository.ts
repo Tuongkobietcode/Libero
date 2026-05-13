@@ -200,6 +200,14 @@ export class CatalogRepository {
     }).exec();
   }
 
+  async listCategories(): Promise<CategoryDocument[]> {
+    return CategoryModel.find().sort({ name: 1 }).exec();
+  }
+
+  async findCategoryById(categoryId: string): Promise<CategoryDocument | null> {
+    return CategoryModel.findById(categoryId).exec();
+  }
+
   async findAuthorByName(name: string, session?: ClientSession): Promise<AuthorDocument | null> {
     let query = AuthorModel.findOne({
       name: new RegExp(`^${escapeRegex(name)}$`, 'i'),
@@ -246,6 +254,115 @@ export class CatalogRepository {
     const category = new CategoryModel({ name });
     await category.save({ session });
     return category;
+  }
+
+  async createCategoryRecord(name: string): Promise<CategoryDocument> {
+    const category = new CategoryModel({ name });
+    await category.save();
+    return category;
+  }
+
+  async updateCategoryById(categoryId: string, update: UpdateQuery<{ name: string }>): Promise<CategoryDocument | null> {
+    return CategoryModel.findByIdAndUpdate(categoryId, update, {
+      new: true,
+      runValidators: true,
+    }).exec();
+  }
+
+  async deleteCategoryById(categoryId: string): Promise<CategoryDocument | null> {
+    return CategoryModel.findByIdAndDelete(categoryId).exec();
+  }
+
+  async countBooksByCategoryId(categoryId: string | Types.ObjectId): Promise<number> {
+    return BookModel.countDocuments({
+      categoryIds: categoryId,
+      isDeleted: false,
+    }).exec();
+  }
+
+  async aggregateCategoryFacets(): Promise<Array<{ _id: Types.ObjectId; count: number }>> {
+    return BookModel.aggregate<{ _id: Types.ObjectId; count: number }>([
+      { $match: { isDeleted: false } },
+      { $unwind: '$categoryIds' },
+      { $group: { _id: '$categoryIds', count: { $sum: 1 } } },
+    ]).exec();
+  }
+
+  async aggregatePublishYearRange(): Promise<{ min: number | null; max: number | null }> {
+    const result = await BookModel.aggregate<{ _id: null; min: number | null; max: number | null }>([
+      { $match: { isDeleted: false, publishYear: { $ne: null } } },
+      { $group: { _id: null, min: { $min: '$publishYear' }, max: { $max: '$publishYear' } } },
+    ]).exec();
+
+    if (result.length === 0) {
+      return { min: null, max: null };
+    }
+
+    return { min: result[0].min, max: result[0].max };
+  }
+
+  async countBooksWithAvailableCopies(): Promise<number> {
+    const ids = await BookCopyModel.distinct('bookId', { status: CopyStatus.Available }).exec();
+    return ids.length;
+  }
+
+  async countBooksWithStatus(status: CopyStatus): Promise<number> {
+    const ids = await BookCopyModel.distinct('bookId', { status }).exec();
+    return ids.length;
+  }
+
+  async aggregatePopularBookIds(windowDays: number, limit: number): Promise<Types.ObjectId[]> {
+    const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+    const result = await LoanRecordModel.aggregate<{ _id: Types.ObjectId; loanCount: number }>([
+      { $match: { borrowDate: { $gte: cutoff } } },
+      { $group: { _id: '$bookId', loanCount: { $sum: 1 } } },
+      { $sort: { loanCount: -1 } },
+      { $limit: limit },
+    ]).exec();
+
+    return result.map((entry) => entry._id);
+  }
+
+  async findTopCategoriesForMember(memberId: string, limit: number): Promise<Types.ObjectId[]> {
+    const result = await LoanRecordModel.aggregate<{ _id: Types.ObjectId; loanCount: number }>([
+      { $match: { memberId: new Types.ObjectId(memberId) } },
+      { $lookup: { from: 'books', localField: 'bookId', foreignField: '_id', as: 'book' } },
+      { $unwind: '$book' },
+      { $unwind: '$book.categoryIds' },
+      { $group: { _id: '$book.categoryIds', loanCount: { $sum: 1 } } },
+      { $sort: { loanCount: -1 } },
+      { $limit: limit },
+    ]).exec();
+
+    return result.map((entry) => entry._id);
+  }
+
+  async findActiveLoanedBookIdsByMember(memberId: string): Promise<Types.ObjectId[]> {
+    const ids = await LoanRecordModel.distinct('bookId', {
+      memberId: new Types.ObjectId(memberId),
+      status: { $in: [LoanStatus.Active, LoanStatus.Overdue] },
+    }).exec();
+
+    return ids.map((value) => new Types.ObjectId(value));
+  }
+
+  async findRecommendedBooks(
+    categoryIds: Types.ObjectId[],
+    excludeBookIds: Types.ObjectId[],
+    limit: number,
+  ): Promise<BookDocument[]> {
+    return BookModel.find({
+      isDeleted: false,
+      categoryIds: { $in: categoryIds },
+      _id: { $nin: excludeBookIds },
+    })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .exec();
+  }
+
+  async findBooksByIds(bookIds: Types.ObjectId[]): Promise<BookDocument[]> {
+    return BookModel.find({ _id: { $in: bookIds }, isDeleted: false }).exec();
   }
 }
 

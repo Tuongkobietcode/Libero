@@ -8,7 +8,8 @@ import { AuthService } from './auth.service';
 import { loginSchema, registerSchema } from './auth.validator';
 import { memberRepository } from './member.repository';
 
-const REFRESH_COOKIE_NAME = 'refreshToken';
+const LEGACY_REFRESH_COOKIE_NAME = 'refreshToken';
+const CLIENT_APP_HEADER = 'x-client-app';
 let authService: AuthService | null = null;
 
 function getAuthService(): AuthService {
@@ -17,6 +18,57 @@ function getAuthService(): AuthService {
   }
 
   return authService;
+}
+
+function getClientApp(req: Request): 'reader' | 'admin' | null {
+  const raw = req.header(CLIENT_APP_HEADER);
+
+  if (raw === 'reader' || raw === 'admin') {
+    return raw;
+  }
+
+  return null;
+}
+
+function getRefreshCookieName(req: Request): string {
+  const app = getClientApp(req);
+
+  return app ? `${app}_refreshToken` : LEGACY_REFRESH_COOKIE_NAME;
+}
+
+function readRefreshTokenCookie(req: Request): { name: string; value: string } | null {
+  const app = getClientApp(req);
+  const cookieName = getRefreshCookieName(req);
+  const primary = req.cookies[cookieName] as string | undefined;
+
+  if (primary) {
+    return { name: cookieName, value: primary };
+  }
+
+  if (app) {
+    return null;
+  }
+
+  const legacy = req.cookies[LEGACY_REFRESH_COOKIE_NAME] as string | undefined;
+
+  if (legacy) {
+    return { name: LEGACY_REFRESH_COOKIE_NAME, value: legacy };
+  }
+
+  return null;
+}
+
+function clearRefreshCookies(req: Request, res: Response, cookieName?: string): void {
+  const options = getRefreshCookieOptions();
+  const cookieNames = new Set<string>([cookieName ?? getRefreshCookieName(req)]);
+
+  if (getClientApp(req)) {
+    cookieNames.add(LEGACY_REFRESH_COOKIE_NAME);
+  }
+
+  for (const name of cookieNames) {
+    res.clearCookie(name, options);
+  }
 }
 
 function getRefreshCookieOptions() {
@@ -34,7 +86,14 @@ export class AuthController {
     const input = loginSchema.parse(req.body);
     const result = await getAuthService().login(input);
 
-    res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, getRefreshCookieOptions());
+    const cookieName = getRefreshCookieName(req);
+    res.cookie(cookieName, result.refreshToken, getRefreshCookieOptions());
+
+    // Clear legacy shared cookie so old reader/admin sessions don't shadow the per-app cookie.
+    if (cookieName !== LEGACY_REFRESH_COOKIE_NAME) {
+      clearRefreshCookies(req, res, LEGACY_REFRESH_COOKIE_NAME);
+    }
+
     res.status(200).json({
       success: true,
       data: {
@@ -55,15 +114,21 @@ export class AuthController {
   }
 
   async refresh(req: Request, res: Response): Promise<void> {
-    const rawRefreshToken = req.cookies[REFRESH_COOKIE_NAME] as string | undefined;
+    const incoming = readRefreshTokenCookie(req);
 
-    if (!rawRefreshToken) {
+    if (!incoming) {
       throw new AuthenticationError(ERR.AUTH_REFRESH_INVALID, 401, 'Refresh token cookie is required');
     }
 
-    const result = await getAuthService().refreshTokens(rawRefreshToken);
+    const result = await getAuthService().refreshTokens(incoming.value);
 
-    res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, getRefreshCookieOptions());
+    const cookieName = getRefreshCookieName(req);
+    res.cookie(cookieName, result.refreshToken, getRefreshCookieOptions());
+
+    if (cookieName !== LEGACY_REFRESH_COOKIE_NAME) {
+      clearRefreshCookies(req, res, LEGACY_REFRESH_COOKIE_NAME);
+    }
+
     res.status(200).json({
       success: true,
       data: {
@@ -74,15 +139,22 @@ export class AuthController {
   }
 
   async logout(req: Request, res: Response): Promise<void> {
-    const rawRefreshToken = req.cookies[REFRESH_COOKIE_NAME] as string | undefined;
+    const incoming = readRefreshTokenCookie(req);
 
-    if (!rawRefreshToken) {
-      throw new AuthenticationError(ERR.AUTH_REFRESH_INVALID, 401, 'Refresh token cookie is required');
+    if (!incoming) {
+      clearRefreshCookies(req, res);
+      res.status(200).json({
+        success: true,
+        data: {
+          success: true,
+        },
+      });
+      return;
     }
 
-    await getAuthService().logout(rawRefreshToken);
+    await getAuthService().logout(incoming.value);
 
-    res.clearCookie(REFRESH_COOKIE_NAME, getRefreshCookieOptions());
+    clearRefreshCookies(req, res, incoming.name);
     res.status(200).json({
       success: true,
       data: {

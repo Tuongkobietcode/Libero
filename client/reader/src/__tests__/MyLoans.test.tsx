@@ -103,11 +103,11 @@ describe('MyLoansPage', () => {
       { route: '/my-loans' },
     );
 
-    const renewButtons = await screen.findAllByRole('button', { name: 'Gia han' });
+    const renewButtons = await screen.findAllByRole('button', { name: 'Gia hạn' });
     expect(renewButtons).toHaveLength(1);
     expect(renewButtons[0]).not.toBeDisabled();
     expect(screen.getByText('Returned Book')).toBeInTheDocument();
-    expect(screen.queryByText(/Chi co the gia han phieu muon dang hoat dong/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Chỉ có thể gia hạn phiếu mượn đang hoạt động/i)).not.toBeInTheDocument();
 
     await userEvent.click(renewButtons[0]);
 
@@ -115,7 +115,7 @@ describe('MyLoansPage', () => {
       expect(renewLoanMock).toHaveBeenCalledWith('loan-active');
     });
 
-    expect(await screen.findByText(/Gia han thanh cong/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Gia hạn thành công/i)).toBeInTheDocument();
   });
 
   it('disables renew when the current reader account is blocked', async () => {
@@ -169,10 +169,10 @@ describe('MyLoansPage', () => {
       { route: '/my-loans' },
     );
 
-    const renewButton = await screen.findByRole('button', { name: 'Gia han' });
+    const renewButton = await screen.findByRole('button', { name: 'Gia hạn' });
     expect(renewButton).toBeDisabled();
     expect(
-      screen.getByText(/Tai khoan cua ban dang bi khoa nen khong the gia han them/i),
+      screen.getByText(/Tài khoản của bạn đang bị khóa nên không thể gia hạn thêm/i),
     ).toBeInTheDocument();
     expect(renewLoanMock).not.toHaveBeenCalled();
   });

@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 
 import { NotificationEvent } from '../../common/types/enums';
+import { Role } from '../../common/types/enums';
 import {
   NotificationLogModel,
   type NotificationLog,
@@ -33,6 +34,67 @@ export class NotificationRepository {
       fullName: member.fullName,
       email: member.email,
     };
+  }
+
+  async findBackofficeContacts(): Promise<NotificationMemberContact[]> {
+    const members = await MemberModel.find({
+      role: { $in: [Role.Admin, Role.Librarian] },
+    })
+      .select('fullName email')
+      .exec();
+
+    return members.map((member) => ({
+      _id: member._id.toString(),
+      fullName: member.fullName,
+      email: member.email,
+    }));
+  }
+
+  async listNotifications(
+    memberId: string | Types.ObjectId,
+    skip: number,
+    limit: number,
+  ): Promise<{ notifications: NotificationLogDocument[]; total: number; unreadTotal: number }> {
+    const filter = {
+      memberId: new Types.ObjectId(memberId.toString()),
+      status: { $ne: 'FAILED' as const },
+    };
+
+    const [notifications, total, unreadTotal] = await Promise.all([
+      NotificationLogModel.find(filter).sort({ sentAt: -1 }).skip(skip).limit(limit).exec(),
+      NotificationLogModel.countDocuments(filter).exec(),
+      NotificationLogModel.countDocuments({ ...filter, readAt: null }).exec(),
+    ]);
+
+    return { notifications, total, unreadTotal };
+  }
+
+  async markNotificationRead(memberId: string | Types.ObjectId, notificationId: string | Types.ObjectId, readAt: Date): Promise<NotificationLogDocument | null> {
+    return NotificationLogModel.findOneAndUpdate(
+      {
+        _id: notificationId,
+        memberId,
+      },
+      {
+        $set: { readAt },
+      },
+      { new: true },
+    ).exec();
+  }
+
+  async markAllNotificationsRead(memberId: string | Types.ObjectId, readAt: Date): Promise<number> {
+    const result = await NotificationLogModel.updateMany(
+      {
+        memberId,
+        readAt: null,
+        status: { $ne: 'FAILED' },
+      },
+      {
+        $set: { readAt },
+      },
+    ).exec();
+
+    return result.modifiedCount;
   }
 
   async findNotificationForDay(

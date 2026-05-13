@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Card, DatePicker, Empty, InputNumber, Space, Table, Typography } from 'antd';
+import { Alert, DatePicker, Empty, InputNumber } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 
+import { AdminPanel, AdminStack, AdminToolbar } from '../../components/AdminSurface';
+import { DataTable } from '../../components/DataTable';
 import { reportApi } from '../../services/report.api';
 
 export default function PopularBooksPage() {
@@ -20,26 +22,26 @@ export default function PopularBooksPage() {
   });
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <div>
-        <Typography.Title level={2} style={{ marginBottom: 0 }}>
-          Sách mượn nhiều
-        </Typography.Title>
-        <Typography.Text type="secondary">Xem các đầu sách được mượn nhiều nhất trong khoảng thời gian đã chọn.</Typography.Text>
-      </div>
-
-      <Card>
-        <Space wrap>
-          <DatePicker.RangePicker value={range as [dayjs.Dayjs, dayjs.Dayjs] | null} onChange={(nextRange) => setRange(nextRange as [dayjs.Dayjs | null, dayjs.Dayjs | null] | null)} />
-          <InputNumber min={1} max={100} value={limit} onChange={(value) => setLimit(value ?? 10)} addonBefore="Số lượng" />
-        </Space>
-      </Card>
+    <AdminStack>
+      <AdminToolbar>
+        <DatePicker.RangePicker
+          value={range as [dayjs.Dayjs, dayjs.Dayjs] | null}
+          onChange={(nextRange) => setRange(nextRange as [dayjs.Dayjs | null, dayjs.Dayjs | null] | null)}
+        />
+        <InputNumber
+          min={1}
+          max={100}
+          value={limit}
+          onChange={(value) => setLimit(value ?? 10)}
+          addonBefore="Số lượng"
+        />
+      </AdminToolbar>
 
       {query.error ? <Alert type="error" showIcon message={(query.error as Error).message} /> : null}
 
-      <Card>
+      <AdminPanel title="Sách mượn nhiều" description="Các đầu sách được mượn nhiều nhất trong khoảng thời gian đã chọn.">
         {query.data?.length ? (
-          <Table
+          <DataTable
             rowKey={(record) => record.book._id}
             loading={query.isLoading}
             pagination={false}
@@ -53,7 +55,7 @@ export default function PopularBooksPage() {
         ) : (
           <Empty description="Không có dữ liệu sách mượn nhiều trong khoảng thời gian đã chọn." />
         )}
-      </Card>
-    </Space>
+      </AdminPanel>
+    </AdminStack>
   );
 }

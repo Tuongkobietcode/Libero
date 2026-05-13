@@ -58,6 +58,13 @@ export interface CreateMemberInput {
   status: MemberStatus | string;
   joinDate?: Date;
   expiryDate?: Date;
+  faculty?: string;
+  className?: string;
+  campus?: string;
+  libraryBranch?: string;
+  membershipTier?: string;
+  lastLoginAt?: Date | null;
+  passwordUpdatedAt?: Date | null;
   isBlocked?: boolean;
   failedLoginCount?: number;
   lockedUntil?: Date | null;

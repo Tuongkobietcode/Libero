@@ -6,12 +6,20 @@ import { Role } from '../../common/types/enums';
 import { memberController } from './member.controller';
 
 const memberRouter = Router();
-const configRouter = Router();
+const loanPolicyRouter = Router();
 
 memberRouter.use(authenticate);
 
 memberRouter.get('/me', (req, res, next) => {
   void memberController.getMyProfile(req, res).catch(next);
+});
+
+memberRouter.get('/me/stats', (req, res, next) => {
+  void memberController.getMyStats(req, res).catch(next);
+});
+
+memberRouter.get('/me/activities', (req, res, next) => {
+  void memberController.getMyActivities(req, res).catch(next);
 });
 
 memberRouter.get('/', authorize(Role.Librarian, Role.Admin), (req, res, next) => {
@@ -38,13 +46,13 @@ memberRouter.patch('/:id/activate', authorize(Role.Librarian, Role.Admin), (req,
   void memberController.activateMember(req, res).catch(next);
 });
 
-configRouter.use(authenticate);
-configRouter.get('/loan-policies', authorize(Role.Admin), (req, res, next) => {
+loanPolicyRouter.use(authenticate);
+loanPolicyRouter.get('/loan-policies', authorize(Role.Admin), (req, res, next) => {
   void memberController.listLoanPolicies(req, res).catch(next);
 });
 
-configRouter.patch('/loan-policies/:role', authorize(Role.Admin), (req, res, next) => {
+loanPolicyRouter.patch('/loan-policies/:role', authorize(Role.Admin), (req, res, next) => {
   void memberController.updateLoanPolicy(req, res).catch(next);
 });
 
-export { configRouter, memberRouter };
+export { loanPolicyRouter, loanPolicyRouter as configRouter, memberRouter };

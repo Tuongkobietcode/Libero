@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Card, DatePicker, Form, Input, Select, Space, Typography } from 'antd';
+import { Alert, DatePicker, Form, Input, Select } from 'antd';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { AdminPanel, AdminStack, primaryButtonClass, secondaryButtonClass } from '../../components/AdminSurface';
 import { memberApi } from '../../services/member.api';
 import { useNotificationsStore } from '../../store/notifications.store';
 import { Role } from '../../types/models';
@@ -81,23 +82,19 @@ export default function MemberFormPage() {
   });
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <div>
-        <Typography.Title level={2} style={{ marginBottom: 0 }}>
-          {isEdit ? 'Chỉnh sửa thành viên' : 'Thêm thành viên'}
-        </Typography.Title>
-        <Typography.Text type="secondary">
-          Giữ hồ sơ thành viên đầy đủ và sẵn sàng cho các quy trình lưu thông.
-        </Typography.Text>
-      </div>
-
+    <AdminStack>
       {memberQuery.error ? (
         <Alert type="error" showIcon message="Không thể tải thông tin thành viên" description={(memberQuery.error as Error).message} />
       ) : null}
 
-      <Card>
-        <Form<MemberFormValues> form={form} layout="vertical" onFinish={(values) => saveMutation.mutate(values)} initialValues={{ role: Role.Student }}>
-          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <AdminPanel title="Thông tin thành viên" description="Giữ hồ sơ đầy đủ để phục vụ các quy trình mượn, đặt giữ và xử lý phạt.">
+        <Form<MemberFormValues>
+          form={form}
+          layout="vertical"
+          onFinish={(values) => saveMutation.mutate(values)}
+          initialValues={{ role: Role.Student }}
+        >
+          <div className="grid gap-x-5 md:grid-cols-2">
             <Form.Item label="Họ và tên" name="fullName" rules={[{ required: true }]}>
               <Input />
             </Form.Item>
@@ -124,18 +121,22 @@ export default function MemberFormPage() {
             <Form.Item label="Ngày hết hạn" name="expiryDate">
               <DatePicker style={{ width: '100%' }} />
             </Form.Item>
-            {saveMutation.isError ? (
-              <Alert type="error" showIcon message={extractErrorMessage(saveMutation.error, 'Không thể lưu thành viên')} />
-            ) : null}
-            <Space>
-              <Button onClick={() => navigate(isEdit ? `/members/${id}` : '/members')}>Hủy</Button>
-              <Button type="primary" htmlType="submit" loading={saveMutation.isPending}>
-                {isEdit ? 'Lưu thay đổi' : 'Tạo thành viên'}
-              </Button>
-            </Space>
-          </Space>
+          </div>
+
+          {saveMutation.isError ? (
+            <Alert type="error" showIcon message={extractErrorMessage(saveMutation.error, 'Không thể lưu thành viên')} />
+          ) : null}
+
+          <div className="mt-5 flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-5">
+            <button className={secondaryButtonClass} onClick={() => navigate(isEdit ? `/members/${id}` : '/members')} type="button">
+              Hủy
+            </button>
+            <button className={primaryButtonClass} disabled={saveMutation.isPending} type="submit">
+              {isEdit ? 'Lưu thay đổi' : 'Tạo thành viên'}
+            </button>
+          </div>
         </Form>
-      </Card>
-    </Space>
+      </AdminPanel>
+    </AdminStack>
   );
 }

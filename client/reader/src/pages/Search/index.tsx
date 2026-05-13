@@ -1,135 +1,120 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import BookCard from '../../components/BookCard';
-import SearchBar from '../../components/SearchBar';
+import { SearchBar } from '../../components/book/SearchBar';
+import { Card } from '../../components/ui/Card';
 import { useDebounce } from '../../hooks/useDebounce';
 import { catalogApi } from '../../services/catalog.api';
-import { extractErrorMessage } from '../../utils/format';
+import { queryKeys } from '../../lib/queryKeys';
+
+import { SearchFilters } from './sections/SearchFilters';
+import { SearchResults, type ViewMode } from './sections/SearchResults';
 
 const PAGE_SIZE = 12;
 
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
+  const [category, setCategory] = useState(searchParams.get('category') ?? '');
   const [availableOnly, setAvailableOnly] = useState(searchParams.get('available') === 'true');
-  const [page, setPage] = useState(Number(searchParams.get('page') ?? '1'));
+  const [page, setPage] = useState(Number(searchParams.get('page') ?? '1') || 1);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+
   const debouncedQuery = useDebounce(query, 300);
 
   useEffect(() => {
-    const nextParams = new URLSearchParams();
+    const next = new URLSearchParams();
+    if (debouncedQuery.trim()) next.set('q', debouncedQuery.trim());
+    if (category) next.set('category', category);
+    if (availableOnly) next.set('available', 'true');
+    if (page > 1) next.set('page', String(page));
+    setSearchParams(next, { replace: true });
+  }, [availableOnly, category, debouncedQuery, page, setSearchParams]);
 
-    if (debouncedQuery.trim()) {
-      nextParams.set('q', debouncedQuery.trim());
-    }
+  const facetsQuery = useQuery({
+    queryKey: queryKeys.facets(),
+    queryFn: () => catalogApi.getFacets(),
+    meta: { errorMessage: 'Không tải được danh sách chủ đề.' },
+  });
 
-    if (availableOnly) {
-      nextParams.set('available', 'true');
-    }
-
-    if (page > 1) {
-      nextParams.set('page', String(page));
-    }
-
-    setSearchParams(nextParams, { replace: true });
-  }, [availableOnly, debouncedQuery, page, setSearchParams]);
-
+  const trimmedQuery = debouncedQuery.trim();
   const booksQuery = useQuery({
-    queryKey: ['reader-search-books', debouncedQuery, availableOnly, page],
+    queryKey: ['reader', 'search-books', trimmedQuery, category, availableOnly, page] as const,
     queryFn: () =>
       catalogApi.listBooks({
-        q: debouncedQuery.trim() || undefined,
+        q: trimmedQuery || undefined,
+        category: category || undefined,
         available: availableOnly ? true : undefined,
         page,
         limit: PAGE_SIZE,
       }),
+    meta: { errorMessage: 'Không thể tìm sách theo bộ lọc hiện tại.' },
   });
 
-  const paginationLabel = useMemo(() => {
-    if (!booksQuery.data) {
-      return '';
+  const heading = useMemo(() => {
+    if (trimmedQuery) return `Kết quả cho "${trimmedQuery}"`;
+    if (category) {
+      const cat = facetsQuery.data?.categories.find((c) => c._id === category);
+      return cat ? `Chủ đề: ${cat.name}` : 'Tìm kiếm sách';
     }
-
-    return `Trang ${booksQuery.data.pagination.page} / ${booksQuery.data.pagination.totalPages || 1}`;
-  }, [booksQuery.data]);
-  const books = booksQuery.data;
+    return 'Tìm kiếm sách';
+  }, [trimmedQuery, category, facetsQuery.data]);
 
   return (
-    <div className="page-stack">
-      <section className="card">
-        <div className="page-header">
-          <h1 className="page-title">Tim sach</h1>
-          <p className="page-description">Loc nhanh theo tu khoa va chi xem nhung dau sach dang con ban sao available neu can.</p>
+    <div className="flex flex-col gap-6">
+      <Card padding="md">
+        <div className="mb-4">
+          <h1 className="text-2xl font-extrabold text-slate-900">{heading}</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Lọc theo chủ đề, tình trạng và từ khóa để tìm đầu sách phù hợp.
+          </p>
         </div>
-
         <SearchBar
-          value={query}
-          onChange={(value) => {
+          defaultValue={query}
+          placeholder="Tìm sách theo tên, tác giả, ISBN..."
+          size="lg"
+          onSubmit={(value) => {
             setQuery(value);
             setPage(1);
+            navigate(`/search${value ? `?q=${encodeURIComponent(value)}` : ''}`, { replace: true });
           }}
-          onSubmit={() => setPage(1)}
-          placeholder="Nhap tu khoa tim kiem..."
-        >
-          <label className="search-addon">
-            <input
-              type="checkbox"
-              checked={availableOnly}
-              onChange={(event) => {
-                setAvailableOnly(event.target.checked);
-                setPage(1);
-              }}
-            />
-            <span>Chi hien sach con san</span>
-          </label>
-        </SearchBar>
-      </section>
+        />
+      </Card>
 
-      <section className="card">
-        <div className="card-header">
-          <div>
-            <h2 className="card-title">Ket qua tim kiem</h2>
-            <p className="card-subtitle">Tap trung vao workflow tim va xem thong tin sach de dat cho hoac den ke sach.</p>
-          </div>
-          {booksQuery.data ? <span className="reader-user-chip">{booksQuery.data.pagination.totalItems} ket qua</span> : null}
-        </div>
+      <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <SearchFilters
+          facets={facetsQuery.data}
+          facetsLoading={facetsQuery.isLoading}
+          category={category}
+          availableOnly={availableOnly}
+          onCategoryChange={(next) => {
+            setCategory(next);
+            setPage(1);
+          }}
+          onAvailableChange={(next) => {
+            setAvailableOnly(next);
+            setPage(1);
+          }}
+          onReset={() => {
+            setCategory('');
+            setAvailableOnly(false);
+            setPage(1);
+          }}
+        />
 
-        {booksQuery.isLoading ? <div className="loading-state">Dang tim sach...</div> : null}
-        {booksQuery.isError ? (
-          <div className="error-banner">{extractErrorMessage(booksQuery.error, 'Khong the tim sach theo bo loc hien tai.')}</div>
-        ) : null}
-        {!booksQuery.isLoading && !booksQuery.isError ? (
-          books && books.items.length > 0 ? (
-            <>
-              <div className="book-grid">
-                {books.items.map((book) => (
-                  <BookCard key={book._id} book={book} />
-                ))}
-              </div>
-              <div className="pagination" style={{ marginTop: 20 }}>
-                <button className="button secondary" type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1}>
-                  Trang truoc
-                </button>
-                <span className="text-muted">{paginationLabel}</span>
-                <button
-                  className="button secondary"
-                  type="button"
-                  onClick={() => setPage((current) => current + 1)}
-                  disabled={page >= (books.pagination.totalPages || 1)}
-                >
-                  Trang sau
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="empty-state">
-              <h3>Khong tim thay dau sach phu hop</h3>
-              <p className="page-description">Hay thu doi tu khoa hoac bo loc de xem them ket qua.</p>
-            </div>
-          )
-        ) : null}
-      </section>
+        <SearchResults
+          result={booksQuery.data}
+          isLoading={booksQuery.isLoading}
+          isError={booksQuery.isError}
+          page={page}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onPageChange={setPage}
+        />
+      </div>
     </div>
   );
 }

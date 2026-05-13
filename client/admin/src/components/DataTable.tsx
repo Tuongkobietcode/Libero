@@ -5,6 +5,7 @@ export function DataTable<RecordType extends object>(props: TableProps<RecordTyp
   return (
     <Table<RecordType>
       size="middle"
+      className={['libero-table', props.className].filter(Boolean).join(' ')}
       scroll={{ x: 960 }}
       pagination={
         props.pagination

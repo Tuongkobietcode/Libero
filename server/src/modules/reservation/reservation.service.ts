@@ -11,10 +11,13 @@ import { ERR } from '../../common/errors/errorCodes';
 import {
   CopyStatus,
   MemberStatus,
+  NotificationEvent,
   ReservationStatus,
   Role,
 } from '../../common/types/enums';
 import { writeAuditLog } from '../../common/utils/auditLogger';
+import { buildBookAuthorsMap, buildBookCategoriesMap } from '../../common/utils/bookAuthors';
+import type { BookNameRef } from '../../common/utils/bookAuthors';
 import { getRequiredMapValue, uniqueObjectIds } from '../../common/utils/collectionHelpers';
 import { buildPagination, buildPaginationResult } from '../../common/utils/pagination';
 import { addHours } from '../../common/utils/dateHelpers';
@@ -25,6 +28,7 @@ import type { BookCopyDocument } from '../../models/BookCopy.model';
 import type { MemberDocument } from '../../models/Member.model';
 import type { ReservationDocument } from '../../models/Reservation.model';
 import { notificationService } from '../notification/notification.service';
+import { realtimeHub } from '../../realtime/realtime';
 import { reservationRepository, type ReservationRepository } from './reservation.repository';
 import type {
   CreateReservationDto,
@@ -49,12 +53,18 @@ interface NotifyNextResult {
   reservationId: string | null;
 }
 
-function createReservationBookRef(book: BookDocument): ReservationBookRef {
+function createReservationBookRef(
+  book: BookDocument,
+  authors: BookNameRef[],
+  categories: BookNameRef[],
+): ReservationBookRef {
   return {
     _id: book._id.toString(),
     isbn: book.isbn,
     title: book.title,
     bookValue: book.bookValue,
+    authors,
+    categories,
   };
 }
 
@@ -83,6 +93,10 @@ function isBorrowerRole(role: Role | undefined): role is Role.Student | Role.Lec
   return role === Role.Student || role === Role.Lecturer;
 }
 
+function isBackofficeRole(role: Role | undefined): role is Role.Admin | Role.Librarian {
+  return role === Role.Admin || role === Role.Librarian;
+}
+
 export class ReservationService {
   constructor(private readonly repository: ReservationRepository = reservationRepository) {}
 
@@ -108,10 +122,11 @@ export class ReservationService {
 
         this.assertReservationAllowed(member);
 
-        const [copyCount, availableCopyCount, existingReservation] = await Promise.all([
+        const [copyCount, availableCopyCount, existingReservation, existingHold] = await Promise.all([
           this.repository.countCopiesByBookId(book._id, session),
           this.repository.countAvailableCopiesByBookId(book._id, session),
           this.repository.findActiveReservationForMemberBook(member._id, book._id, session),
+          this.repository.findActiveBookHoldForMemberBook(member._id, book._id, session),
         ]);
 
         if (copyCount === 0) {
@@ -122,11 +137,13 @@ export class ReservationService {
           throw new BusinessRuleError(ERR.RES_COPY_AVAILABLE, 422, 'Reservation is not allowed while a copy is available');
         }
 
-        if (existingReservation) {
+        if (existingReservation || existingHold) {
           throw new ConflictError(
             ERR.RES_ALREADY_RESERVED,
             409,
-            `Member already has an active reservation for this book (position #${existingReservation.queuePosition})`,
+            existingReservation
+              ? `Member already has an active reservation for this book (position #${existingReservation.queuePosition})`
+              : 'Member already has an active hold for this book',
           );
         }
 
@@ -158,6 +175,8 @@ export class ReservationService {
 
     const result = await this.getReservationDetail(createdReservationId);
     this.writeAudit(actor, 'CREATE_RESERVATION', 'Reservation', createdReservationId, undefined, result);
+    this.publishReservationEvent('created', result);
+    await this.queueReservationCreatedNotifications(result, isBackofficeRole(actor?.actorRole));
 
     return result;
   }
@@ -370,7 +389,7 @@ export class ReservationService {
     return filter;
   }
 
-  private async getReservationDetail(reservationId: string): Promise<ReservationDetail> {
+  async getReservationDetail(reservationId: string): Promise<ReservationDetail> {
     const reservation = await this.repository.findReservationById(reservationId);
 
     if (!reservation) {
@@ -405,11 +424,24 @@ export class ReservationService {
       this.repository.findCopiesByIds(copyIds),
     ]);
 
+    const [authorsByBook, categoriesByBook, queueTotalByBook] = await Promise.all([
+      buildBookAuthorsMap(books),
+      buildBookCategoriesMap(books),
+      this.repository.countActiveReservationsByBookIds(bookIds),
+    ]);
+
     const memberMap = new Map<string, ReservationMemberRef>(
       members.map((member) => [member._id.toString(), createReservationMemberRef(member)]),
     );
     const bookMap = new Map<string, ReservationBookRef>(
-      books.map((book) => [book._id.toString(), createReservationBookRef(book)]),
+      books.map((book) => [
+        book._id.toString(),
+        createReservationBookRef(
+          book,
+          authorsByBook.get(book._id.toString()) ?? [],
+          categoriesByBook.get(book._id.toString()) ?? [],
+        ),
+      ]),
     );
     const copyMap = new Map<string, ReservationCopyRef>(
       copies.map((copy) => [copy._id.toString(), createReservationCopyRef(copy)]),
@@ -421,6 +453,7 @@ export class ReservationService {
       book: getRequiredMapValue(bookMap, reservation.bookId.toString(), 'Reservation book not found'),
       copy: reservation.copyId ? copyMap.get(reservation.copyId.toString()) : undefined,
       queuePosition: reservation.queuePosition,
+      queueTotal: queueTotalByBook.get(reservation.bookId.toString()) ?? 0,
       status: reservation.status,
       requestDate: reservation.requestDate,
       notifiedAt: reservation.notifiedAt,
@@ -521,6 +554,56 @@ export class ReservationService {
       logger.error(
         { err: error, reservationId: reservation._id },
         'Failed to enqueue reservation notification',
+      );
+    }
+  }
+
+  private publishReservationEvent(action: string, reservation: ReservationDetail): void {
+    const payload = {
+      memberId: reservation.member._id,
+      bookId: reservation.book._id,
+      status: reservation.status,
+      queuePosition: reservation.queuePosition,
+    };
+
+    realtimeHub.emitBackofficeEvent({
+      type: NotificationEvent.ReservationRequested,
+      resource: 'reservation',
+      action,
+      referenceId: reservation._id,
+      payload,
+    });
+
+    realtimeHub.emitUserEvent(reservation.member._id, {
+      type: NotificationEvent.ReservationCreated,
+      resource: 'reservation',
+      action,
+      referenceId: reservation._id,
+      payload,
+    });
+  }
+
+  private async queueReservationCreatedNotifications(reservation: ReservationDetail, createdByBackoffice: boolean): Promise<void> {
+    try {
+      await notificationService.enqueueReservationCreated(
+        reservation.member._id,
+        reservation._id,
+        reservation.book.title,
+        createdByBackoffice,
+      );
+
+      if (!createdByBackoffice) {
+        await notificationService.enqueueReservationRequestedForBackoffice(
+          reservation._id,
+          reservation.member.fullName,
+          reservation.member.memberCardNo,
+          reservation.book.title,
+        );
+      }
+    } catch (error) {
+      logger.error(
+        { err: error, reservationId: reservation._id },
+        'Failed to enqueue reservation created notification',
       );
     }
   }

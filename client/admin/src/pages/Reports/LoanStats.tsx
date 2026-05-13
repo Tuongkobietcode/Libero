@@ -1,9 +1,11 @@
 import { DownloadOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Button, Card, DatePicker, Empty, Select, Space, Table, Typography } from 'antd';
+import { Alert, DatePicker, Empty, Select } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 
+import { AdminPanel, AdminStack, AdminToolbar, secondaryButtonClass } from '../../components/AdminSurface';
+import { DataTable } from '../../components/DataTable';
 import { reportApi } from '../../services/report.api';
 import { downloadBlob } from '../../utils/format';
 import type { ReportGroupBy } from '../../types/models';
@@ -34,39 +36,36 @@ export default function LoanStatsPage() {
   };
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <div>
-        <Typography.Title level={2} style={{ marginBottom: 0 }}>
-          Thống kê mượn trả
-        </Typography.Title>
-        <Typography.Text type="secondary">Theo dõi số lượng phiếu mượn và biến động trạng thái theo ngày, tuần hoặc tháng.</Typography.Text>
-      </div>
-
-      <Card>
-        <Space wrap>
-          <DatePicker.RangePicker value={range as [dayjs.Dayjs, dayjs.Dayjs] | null} onChange={(nextRange) => setRange(nextRange as [dayjs.Dayjs | null, dayjs.Dayjs | null] | null)} />
-          <Select
-            value={groupBy}
-            style={{ width: 160 }}
-            onChange={(value) => setGroupBy(value)}
-            options={[
-              { label: 'Theo ngày', value: 'day' },
-              { label: 'Theo tuần', value: 'week' },
-              { label: 'Theo tháng', value: 'month' },
-            ]}
-          />
-          <Button icon={<DownloadOutlined />} onClick={() => void handleExport('xlsx')}>
-            Xuất XLSX
-          </Button>
-          <Button onClick={() => void handleExport('pdf')}>Xuất PDF</Button>
-        </Space>
-      </Card>
+    <AdminStack>
+      <AdminToolbar>
+        <DatePicker.RangePicker
+          value={range as [dayjs.Dayjs, dayjs.Dayjs] | null}
+          onChange={(nextRange) => setRange(nextRange as [dayjs.Dayjs | null, dayjs.Dayjs | null] | null)}
+        />
+        <Select
+          value={groupBy}
+          className="min-w-40"
+          onChange={(value) => setGroupBy(value)}
+          options={[
+            { label: 'Theo ngày', value: 'day' },
+            { label: 'Theo tuần', value: 'week' },
+            { label: 'Theo tháng', value: 'month' },
+          ]}
+        />
+        <button className={secondaryButtonClass} onClick={() => void handleExport('xlsx')} type="button">
+          <DownloadOutlined />
+          Xuất XLSX
+        </button>
+        <button className={secondaryButtonClass} onClick={() => void handleExport('pdf')} type="button">
+          Xuất PDF
+        </button>
+      </AdminToolbar>
 
       {query.error ? <Alert type="error" showIcon message={(query.error as Error).message} /> : null}
 
-      <Card>
+      <AdminPanel title="Số liệu mượn trả" description="Theo dõi biến động khoản mượn theo ngày, tuần hoặc tháng.">
         {query.data?.length ? (
-          <Table
+          <DataTable
             rowKey="period"
             pagination={false}
             loading={query.isLoading}
@@ -83,7 +82,7 @@ export default function LoanStatsPage() {
         ) : (
           <Empty description="Không có dữ liệu thống kê trong khoảng thời gian đã chọn." />
         )}
-      </Card>
-    </Space>
+      </AdminPanel>
+    </AdminStack>
   );
 }

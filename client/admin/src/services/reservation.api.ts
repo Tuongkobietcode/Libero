@@ -16,6 +16,10 @@ export const reservationApi = {
     const response = await apiClient.get<ApiEnvelope<PaginatedResult<ReservationListItem>>>('/reservations', { params });
     return unwrapResponse(response.data);
   },
+  async createReservationForMember(payload: { memberId: string; bookId: string }): Promise<ReservationListItem> {
+    const response = await apiClient.post<ApiEnvelope<ReservationListItem>>('/reservations/for-member', payload);
+    return unwrapResponse(response.data);
+  },
   async cancelReservation(reservationId: string): Promise<ReservationListItem> {
     const response = await apiClient.delete<ApiEnvelope<ReservationListItem>>(`/reservations/${reservationId}`);
     return unwrapResponse(response.data);

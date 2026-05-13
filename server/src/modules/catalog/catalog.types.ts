@@ -51,6 +51,14 @@ export interface UpdateCopyStatusDto {
   status: CopyStatus;
 }
 
+export interface CreateCategoryDto {
+  name: string;
+}
+
+export interface UpdateCategoryDto {
+  name?: string;
+}
+
 export interface CsvImportRow {
   isbn: string;
   title: string;
@@ -89,6 +97,9 @@ export interface BookListItem {
   publishYear?: number;
   description?: string;
   coverImage?: string;
+  language?: string;
+  pageCount?: number;
+  bookSize?: string;
   totalCopies: number;
   availableCopies: number;
   createdAt: Date;
@@ -109,4 +120,27 @@ export interface CsvImportResult {
   successCount: number;
   failedCount: number;
   errors: CsvImportErrorDetail[];
+}
+
+export interface CategoryFacet {
+  _id: string;
+  name: string;
+  count: number;
+}
+
+export interface CategoryListItem extends CategoryFacet {
+  canDelete: boolean;
+}
+
+export interface CatalogFacets {
+  categories: CategoryFacet[];
+  statuses: {
+    available: number;
+    borrowing: number;
+    soon: number;
+  };
+  publishYear: {
+    min: number | null;
+    max: number | null;
+  };
 }

@@ -233,8 +233,11 @@ describe('Loan Phase 5 integration', () => {
     app.use(errorHandler);
 
     try {
-      await mongoose.connect('mongodb://localhost:27017/libero-loan-test?replicaSet=rs0');
+      await mongoose.connect('mongodb://localhost:27017/libero-loan-test?replicaSet=rs0', {
+        serverSelectionTimeoutMS: 1_000,
+      });
     } catch {
+      await mongoose.disconnect();
       replSet = await MongoMemoryReplSet.create({
         replSet: {
           count: 1,

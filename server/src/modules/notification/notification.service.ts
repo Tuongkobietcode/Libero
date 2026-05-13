@@ -4,10 +4,13 @@ import { NotFoundError } from '../../common/errors/AppError';
 import { ERR } from '../../common/errors/errorCodes';
 import { NotificationEvent } from '../../common/types/enums';
 import { endOfUtcDay, startOfUtcDay } from '../../common/utils/dateHelpers';
+import { buildPagination, buildPaginationResult } from '../../common/utils/pagination';
 import { logger } from '../../common/middleware/requestLogger';
 import { getJobQueue } from '../../config/queue';
 import { env } from '../../config/env';
-import type { NotificationLogStatus } from '../../models/NotificationLog.model';
+import type { NotificationLogDocument, NotificationLogStatus } from '../../models/NotificationLog.model';
+import type { NotificationListItem } from '@libero/shared';
+import { realtimeHub } from '../../realtime/realtime';
 import {
   notificationRepository,
   type NotificationMemberContact,
@@ -77,6 +80,9 @@ const eventSubjects: Record<NotificationEvent, string> = {
   [NotificationEvent.CheckoutConfirmation]: 'LIBERO - Checkout confirmation',
   [NotificationEvent.AccountBlocked]: 'LIBERO - Account blocked',
   [NotificationEvent.AccountActivated]: 'LIBERO - Account activated',
+  [NotificationEvent.ReservationCreated]: 'LIBERO - Reservation created',
+  [NotificationEvent.ReservationRequested]: 'LIBERO - New reservation request',
+  [NotificationEvent.BookHoldCreated]: 'LIBERO - Book hold created',
 };
 
 function buildLoanRenewLink(): string {
@@ -230,6 +236,96 @@ export class NotificationService {
     });
   }
 
+  async enqueueReservationCreated(
+    memberId: string,
+    reservationId: string,
+    bookTitle: string,
+    createdByAdmin: boolean,
+    now: Date = new Date(),
+  ): Promise<EnqueueEmailResult> {
+    return this.enqueueInAppNotification({
+      memberId,
+      eventType: NotificationEvent.ReservationCreated,
+      referenceId: reservationId,
+      title: 'Đặt chỗ thành công',
+      body: createdByAdmin
+        ? `Thư viện đã tạo đặt chỗ cho sách "${bookTitle}" trong tài khoản của bạn.`
+        : `Bạn đã đặt chỗ sách "${bookTitle}" thành công.`,
+      link: '/my-reservations',
+      now,
+    });
+  }
+
+  async enqueueReservationRequestedForBackoffice(
+    reservationId: string,
+    memberName: string,
+    memberCardNo: string,
+    bookTitle: string,
+    now: Date = new Date(),
+  ): Promise<EnqueueEmailResult[]> {
+    const recipients = await this.repository.findBackofficeContacts();
+
+    return Promise.all(
+      recipients.map((recipient) =>
+        this.enqueueInAppNotification({
+          memberId: recipient._id,
+          eventType: NotificationEvent.ReservationRequested,
+          referenceId: reservationId,
+          title: 'Có yêu cầu đặt chỗ mới',
+          body: `${memberName} (${memberCardNo}) vừa đặt chỗ sách "${bookTitle}".`,
+          link: '/reservations',
+          now,
+        }),
+      ),
+    );
+  }
+
+  async enqueueBookHoldCreated(
+    memberId: string,
+    holdId: string,
+    bookId: string,
+    bookTitle: string,
+    shelfLocation: string | undefined,
+    holdExpiryAt: Date,
+    createdByBackoffice: boolean,
+    now: Date = new Date(),
+  ): Promise<EnqueueEmailResult> {
+    return this.enqueueInAppNotification({
+      memberId,
+      eventType: NotificationEvent.BookHoldCreated,
+      referenceId: holdId,
+      title: 'Đặt giữ thành công',
+      body: `${createdByBackoffice ? 'Thư viện đã giữ' : 'Bạn đã giữ'} sách "${bookTitle}"${shelfLocation ? ` tại ${shelfLocation}` : ''}. Vui lòng đến nhận trước ${holdExpiryAt.toLocaleString('vi-VN')}.`,
+      link: `/books/${bookId}`,
+      now,
+    });
+  }
+
+  async listMyNotifications(memberId: string, query: { page?: number; limit?: number }) {
+    const pagination = buildPagination({ page: query.page, limit: query.limit ?? 10 });
+    const { notifications, total, unreadTotal } = await this.repository.listNotifications(memberId, pagination.skip, pagination.limit);
+
+    return {
+      ...buildPaginationResult(notifications.map((notification) => this.toNotificationListItem(notification)), total, pagination),
+      unreadTotal,
+    };
+  }
+
+  async markNotificationRead(memberId: string, notificationId: string): Promise<NotificationListItem> {
+    const notification = await this.repository.markNotificationRead(memberId, notificationId, new Date());
+
+    if (!notification) {
+      throw new NotFoundError(ERR.COMMON_NOT_FOUND, 404, 'Notification not found');
+    }
+
+    return this.toNotificationListItem(notification);
+  }
+
+  async markAllNotificationsRead(memberId: string): Promise<{ updatedCount: number }> {
+    const updatedCount = await this.repository.markAllNotificationsRead(memberId, new Date());
+    return { updatedCount };
+  }
+
   async enqueueEmail(params: EnqueueEmailParams): Promise<EnqueueEmailResult> {
     const { template, memberId, eventType, referenceId, context, now = new Date() } = params;
     const dateFrom = startOfUtcDay(now);
@@ -289,6 +385,8 @@ export class NotificationService {
         },
       );
 
+      this.publishNotification(memberId, log);
+
       return {
         skipped: false,
         logId: log._id.toString(),
@@ -300,6 +398,114 @@ export class NotificationService {
       logger.error({ err: error, memberId, eventType, referenceId }, 'Failed to enqueue email notification');
       throw error;
     }
+  }
+
+  private async enqueueInAppNotification(params: {
+    memberId: string;
+    eventType: NotificationEvent;
+    referenceId: string;
+    title: string;
+    body?: string;
+    link?: string;
+    now?: Date;
+  }): Promise<EnqueueEmailResult> {
+    const { memberId, eventType, referenceId, title, body, link, now = new Date() } = params;
+    const dateFrom = startOfUtcDay(now);
+    const dateTo = endOfUtcDay(now);
+    const existingLog = await this.repository.findNotificationForDay(
+      memberId,
+      eventType,
+      referenceId,
+      dateFrom,
+      dateTo,
+      activeDedupStatuses,
+    );
+
+    if (existingLog) {
+      return {
+        skipped: true,
+        logId: existingLog._id.toString(),
+        jobId: null,
+      };
+    }
+
+    const member = await this.repository.findMemberContactById(memberId);
+
+    if (!member) {
+      throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
+    }
+
+    const log = await this.repository.createNotificationLog({
+      memberId,
+      eventType,
+      referenceId,
+      template: 'in_app',
+      recipientEmail: member.email,
+      subject: title,
+      title,
+      body,
+      link,
+      status: 'SENT',
+      sentAt: now,
+      lastError: null,
+    });
+
+    this.publishNotification(memberId, log);
+
+    return {
+      skipped: false,
+      logId: log._id.toString(),
+      jobId: null,
+    };
+  }
+
+  private publishNotification(memberId: string, notification: NotificationLogDocument): void {
+    const item = this.toNotificationListItem(notification);
+
+    realtimeHub.emitNotification(memberId, item);
+    realtimeHub.emitUserEvent(memberId, {
+      type: item.eventType,
+      resource: 'notification',
+      action: 'created',
+      referenceId: item.referenceId,
+      payload: {
+        notificationId: item._id,
+        link: item.link,
+      },
+    });
+  }
+
+  private toNotificationListItem(notification: NotificationLogDocument): NotificationListItem {
+    return {
+      _id: notification._id.toString(),
+      eventType: notification.eventType,
+      referenceId: notification.referenceId.toString(),
+      title: notification.title ?? notification.subject,
+      body: notification.body ?? undefined,
+      link: notification.link ?? this.getDefaultLink(notification.eventType),
+      readAt: notification.readAt?.toISOString() ?? null,
+      sentAt: notification.sentAt.toISOString(),
+    };
+  }
+
+  private getDefaultLink(eventType: NotificationEvent): string | undefined {
+    if (eventType === NotificationEvent.BookAvailable || eventType === NotificationEvent.HoldExpiring || eventType === NotificationEvent.ReservationCreated) {
+      return '/my-reservations';
+    }
+
+    if (eventType === NotificationEvent.BookHoldCreated) {
+      return '/search';
+    }
+
+    if (eventType === NotificationEvent.CheckoutConfirmation || eventType === NotificationEvent.DueReminder || eventType === NotificationEvent.Overdue) {
+      return '/my-loans';
+    }
+
+    if (eventType === NotificationEvent.ReservationRequested) {
+      return '/reservations';
+    }
+
+    return undefined;
   }
 
   private buildContext(

@@ -41,6 +41,11 @@ export const createMemberSchema = z.object({
   role: z.nativeEnum(Role),
   joinDate: z.coerce.date().optional(),
   expiryDate: z.coerce.date().optional(),
+  faculty: optionalTrimmedString,
+  className: optionalTrimmedString,
+  campus: optionalTrimmedString,
+  libraryBranch: optionalTrimmedString,
+  membershipTier: optionalTrimmedString,
 });
 
 export const updateMemberSchema = z
@@ -52,8 +57,17 @@ export const updateMemberSchema = z
     role: z.nativeEnum(Role).optional(),
     joinDate: z.coerce.date().optional(),
     expiryDate: z.coerce.date().optional(),
+    faculty: optionalTrimmedString,
+    className: optionalTrimmedString,
+    campus: optionalTrimmedString,
+    libraryBranch: optionalTrimmedString,
+    membershipTier: optionalTrimmedString,
   })
   .refine((value) => Object.values(value).some((field) => field !== undefined), 'At least one field must be provided');
+
+export const myActivitiesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+});
 
 export const suspendMemberSchema = z.object({
   reason: z.string().trim().min(3).max(500).optional(),
