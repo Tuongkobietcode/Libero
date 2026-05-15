@@ -310,7 +310,7 @@ export default function CreateCheckoutPage() {
                 />
               </span>
               <button
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 disabled={!booksQuery.data?.items.length || addBookMutation.isPending}
                 onClick={() => {
                   const first = booksQuery.data?.items[0];
@@ -404,14 +404,14 @@ export default function CreateCheckoutPage() {
           </section>
 
           <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-5">
-            <Link className="inline-flex h-11 items-center rounded-xl border border-slate-200 px-6 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50" to="/circulation/checkout">
+            <Link className="inline-flex h-11 items-center rounded-xl border border-slate-200 px-6 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" to="/circulation/checkout">
               Hủy
             </Link>
-            <button className="h-11 rounded-xl border border-slate-200 px-6 text-sm font-extrabold text-slate-400" disabled title="Chưa có API lưu nháp" type="button">
+            <button className="h-11 rounded-xl border border-slate-200 px-6 text-sm font-semibold text-slate-400" disabled title="Chưa có API lưu nháp" type="button">
               Lưu nháp
             </button>
             <button
-              className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#4f46e5] px-6 text-sm font-extrabold text-white shadow-[0_14px_30px_rgba(79,70,229,0.24)] transition hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-45"
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#4f46e5] px-6 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(79,70,229,0.24)] transition hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-45"
               disabled={!canBorrow || createMutation.isPending}
               onClick={() => createMutation.mutate()}
               type="button"

@@ -18,7 +18,7 @@ import { Link } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
-import { primaryActionButtonClass } from '../../components/AdminSurface';
+import { AdminSelect, primaryActionButtonClass } from '../../components/AdminSurface';
 import { loanApi } from '../../services/loan.api';
 import { useNotificationsStore } from '../../store/notifications.store';
 import { LoanStatus, type LoanListItem } from '../../types/models';
@@ -34,10 +34,10 @@ const statusOptions = [
 ] as const;
 
 const statusTone: Record<LoanStatus, string> = {
-  [LoanStatus.Active]: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
-  [LoanStatus.Overdue]: 'bg-red-50 text-red-700 ring-red-100',
-  [LoanStatus.Returned]: 'bg-blue-50 text-blue-700 ring-blue-100',
-  [LoanStatus.Lost]: 'bg-orange-50 text-orange-700 ring-orange-100',
+  [LoanStatus.Active]: 'bg-emerald-50 text-emerald-600',
+  [LoanStatus.Overdue]: 'bg-rose-50 text-rose-600',
+  [LoanStatus.Returned]: 'bg-cyan-50 text-cyan-600',
+  [LoanStatus.Lost]: 'bg-orange-50 text-orange-600',
 };
 
 function buildLoanCode(loan: LoanListItem, index: number): string {
@@ -110,8 +110,8 @@ function StatCard({
 
 function StatusPill({ status }: { status: LoanStatus }) {
   return (
-    <span className={`inline-flex rounded-lg px-3 py-1 text-xs font-extrabold ring-1 ${statusTone[status]}`}>
-      {status}
+    <span className={`inline-flex rounded-lg px-3 py-1 text-xs font-extrabold ${statusTone[status]}`}>
+      {getStatusLabel(status)}
     </span>
   );
 }
@@ -267,8 +267,9 @@ export default function CheckoutPage() {
 
           <label className="grid gap-1">
             <span className="text-xs font-bold text-slate-500">Trạng thái</span>
-            <select
-              className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none"
+            <AdminSelect
+              wrapperClassName="w-full"
+              className="h-11"
               onChange={(event) => {
                 setPage(1);
                 setStatus(event.target.value as LoanStatus | '');
@@ -280,7 +281,7 @@ export default function CheckoutPage() {
                   {option.label}
                 </option>
               ))}
-            </select>
+            </AdminSelect>
           </label>
 
           <label className="grid gap-1">
@@ -299,12 +300,12 @@ export default function CheckoutPage() {
           </label>
 
           <div className="flex items-end gap-3">
-            <button className="inline-flex h-12 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50" type="button">
+            <button className="inline-flex h-12 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button">
               <FilterOutlined />
               Bộ lọc khác
             </button>
             <button
-              className="inline-flex h-12 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex h-12 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               onClick={() => {
                 setKeyword('');
                 setStatus('');
@@ -322,7 +323,7 @@ export default function CheckoutPage() {
           <span className="font-medium text-slate-600">Bộ lọc đang chọn:</span>
           <span className="rounded-full bg-slate-100 px-4 py-2 font-bold text-slate-700">30 ngày qua</span>
           <span className="rounded-full bg-slate-100 px-4 py-2 font-bold text-slate-700">{status ? getStatusLabel(status) : 'Tất cả trạng thái'}</span>
-          <button className="font-bold text-blue-600" onClick={() => setStatus('')} type="button">
+          <button className="font-semibold text-blue-600" onClick={() => setStatus('')} type="button">
             Xóa tất cả
           </button>
         </div>
@@ -408,12 +409,12 @@ export default function CheckoutPage() {
             Hiển thị {loans.length ? (page - 1) * 10 + 1 : 0} đến {(page - 1) * 10 + loans.length} trong tổng số {loansQuery.data?.pagination.totalItems ?? 0} khoản mượn
           </span>
           <div className="flex items-center gap-2">
-            <button className="h-9 rounded-lg border border-slate-200 px-3 font-bold disabled:opacity-40" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} type="button">
+            <button className="h-9 rounded-lg border border-slate-200 px-3 font-semibold disabled:opacity-40" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} type="button">
               Trước
             </button>
-            <span className="grid h-9 min-w-9 place-items-center rounded-lg bg-[#4f46e5] px-3 font-extrabold text-white">{page}</span>
+            <span className="grid h-9 min-w-9 place-items-center rounded-lg bg-white px-3 font-semibold !text-[#1677ff] shadow-[0_16px_36px_rgba(22,119,255,0.14)] ring-1 ring-blue-50">{page}</span>
             <span>/ {totalPages}</span>
-            <button className="h-9 rounded-lg border border-slate-200 px-3 font-bold disabled:opacity-40" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)} type="button">
+            <button className="h-9 rounded-lg border border-slate-200 px-3 font-semibold disabled:opacity-40" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)} type="button">
               Sau
             </button>
           </div>

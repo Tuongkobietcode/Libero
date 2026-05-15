@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import rateLimit from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
 
+import { env } from '../../config/env';
 import { RateLimitError } from '../errors/AppError';
 import { ERR } from '../errors/errorCodes';
 import { sendRedisCommand } from '../utils/redisCommand';
@@ -12,10 +13,14 @@ export const rateLimiter = rateLimit({
   limit: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  store: new RedisStore({
-    sendCommand: (...args: string[]) => sendRedisCommand(...args),
-    prefix: 'rl:global:',
-  }),
+  ...(env.NODE_ENV === 'production'
+    ? {
+        store: new RedisStore({
+          sendCommand: (...args: string[]) => sendRedisCommand(...args),
+          prefix: 'rl:global:',
+        }),
+      }
+    : {}),
   handler: (req, res, next) => {
     if (!req.requestId) {
       req.requestId = req.header('x-request-id') || randomUUID();

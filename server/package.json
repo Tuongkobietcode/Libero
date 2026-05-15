@@ -4,10 +4,11 @@
   "version": "1.0.0",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only --exit-child src/server.ts",
+    "dev": "node -r ts-node/register/transpile-only src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "seed": "ts-node --project tsconfig.json src/scripts/seed.ts",
+    "seed:reset-demo": "ts-node --project tsconfig.json src/scripts/seed.ts --reset-demo",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint \"src/**/*.ts\"",
     "test": "jest --config ./jest.config.js --passWithNoTests --runInBand"

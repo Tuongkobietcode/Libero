@@ -18,7 +18,7 @@ import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
-import { primaryActionButtonClass } from '../../components/AdminSurface';
+import { AdminSelect, primaryActionButtonClass } from '../../components/AdminSurface';
 import { BookCoverArt } from '../../components/BookCoverArt';
 import { catalogApi } from '../../services/catalog.api';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -287,10 +287,11 @@ export default function BookListPage() {
 
           <label className="block">
             <span className="mb-2 block text-xs font-bold text-slate-500">Danh mục</span>
-            <select
+            <AdminSelect
               value={category}
               onChange={(event) => updateParam('category', event.target.value)}
-              className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+              wrapperClassName="w-full"
+              className="h-11"
             >
               <option value="all">Tất cả danh mục</option>
               {facetsQuery.data?.categories.map((item) => (
@@ -298,25 +299,26 @@ export default function BookListPage() {
                   {item.name}
                 </option>
               ))}
-            </select>
+            </AdminSelect>
           </label>
 
           <label className="block">
             <span className="mb-2 block text-xs font-bold text-slate-500">Tình trạng bản sao</span>
-            <select
+            <AdminSelect
               value={available}
               onChange={(event) => updateParam('available', event.target.value)}
-              className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+              wrapperClassName="w-full"
+              className="h-11"
             >
               <option value="all">Tất cả</option>
               <option value="available">Còn bản sẵn</option>
               <option value="unavailable">Hết bản sẵn</option>
-            </select>
+            </AdminSelect>
           </label>
 
           <button
             type="button"
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-extrabold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600"
           >
             <FilterOutlined />
             Bộ lọc khác
@@ -325,7 +327,7 @@ export default function BookListPage() {
           <button
             type="button"
             onClick={resetFilters}
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-extrabold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600"
           >
             <ReloadOutlined />
             Đặt lại
@@ -473,17 +475,17 @@ export default function BookListPage() {
             </p>
 
             <div className="flex flex-wrap items-center gap-3">
-              <select
+              <AdminSelect
                 value={limit}
                 onChange={(event) => updatePagination(1, Number(event.target.value))}
-                className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                wrapperClassName="w-32"
               >
                 {[10, 20, 50].map((pageSize) => (
                   <option value={pageSize} key={pageSize}>
                     {pageSize} / trang
                   </option>
                 ))}
-              </select>
+              </AdminSelect>
 
               <button
                 type="button"
@@ -497,7 +499,7 @@ export default function BookListPage() {
 
               {visiblePages.map((pageItem, index) =>
                 pageItem === 'ellipsis' ? (
-                  <span className="grid h-11 w-8 place-items-center text-sm font-extrabold text-slate-500" key={`ellipsis-${index}`}>
+                  <span className="grid h-11 w-8 place-items-center text-sm font-semibold text-slate-500" key={`ellipsis-${index}`}>
                     ...
                   </span>
                 ) : (
@@ -505,9 +507,9 @@ export default function BookListPage() {
                     type="button"
                     onClick={() => updatePagination(pageItem)}
                     className={[
-                      'grid h-11 min-w-11 place-items-center rounded-xl px-3 text-sm font-extrabold transition',
+                      'grid h-11 min-w-11 place-items-center rounded-xl px-3 text-sm font-semibold transition',
                       pageItem === page
-                        ? 'bg-indigo-600 text-white shadow-[0_10px_22px_rgba(79,70,229,0.25)]'
+                        ? 'bg-white !text-[#1677ff] shadow-[0_16px_36px_rgba(22,119,255,0.14)] ring-1 ring-blue-50'
                         : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600',
                     ].join(' ')}
                     key={pageItem}

@@ -1,22 +1,13 @@
 # LIBERO
 
-LIBERO is a library management system built with:
+LIBERO is a library management system built with Node.js, Express, MongoDB, Redis, BullMQ, Socket.IO, React, Vite, TypeScript, Tailwind, and Ant Design.
 
-- MongoDB
-- Mongoose
-- Node.js
-- Express
-- React
-- Vite
-- TypeScript
-- Redis
-- BullMQ
-
-This repository currently includes:
+Repository layout:
 
 - `server`: backend API
-- `client/admin`: admin frontend
-- `client/reader`: reader frontend
+- `client/admin`: admin and librarian UI
+- `client/reader`: reader UI
+- `shared`: shared models, enums, and types
 
 ## Prerequisites
 
@@ -25,25 +16,37 @@ This repository currently includes:
 - Docker Desktop
 - PowerShell on Windows
 
-## Quick Start
+## Local Ports
+
+| Service | URL |
+| --- | --- |
+| Backend API | `http://localhost:5000/api/v1` |
+| Reader UI | `http://localhost:5173/` |
+| Admin UI | `http://localhost:5174/admin/` |
+| MongoDB | `localhost:27017` |
+| Redis | `localhost:6379` |
+
+The admin Vite app uses `base: /admin/`, so open `http://localhost:5174/admin/`, not just `http://localhost:5174/`.
+
+## First-Time Setup on a New Machine
 
 ### 1. Clone and install dependencies
 
 ```powershell
 git clone <your-repo-url>
-cd libero
+cd Libero
 npm install
 ```
 
-### 2. Create local env
+### 2. Create the backend env file
 
-Create the root env file if it does not exist yet:
+The backend reads `server/.env` first, then root `.env`. For local setup, use the root `.env`:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Default local backend env:
+Expected local values:
 
 ```env
 NODE_ENV=development
@@ -60,24 +63,29 @@ SMTP_PASS=replace-me
 FINE_BLOCK_THRESHOLD=50000
 HOLD_EXPIRY_HOURS=48
 FRONTEND_URL=http://localhost:5173
+CORS_ORIGINS=http://localhost:5173,http://localhost:5174
 ```
 
-Admin and reader frontends already point to the local backend through:
+Important:
+
+- `MONGODB_URI` must include `replicaSet=rs0`. Some flows use MongoDB transactions.
+- `CORS_ORIGINS` must include both reader and admin origins.
+- `JWT_SECRET` must be at least 32 characters.
+
+Frontend env files are already committed for local development:
 
 - `client/admin/.env.development`
 - `client/reader/.env.development`
 
-Both use:
+Both point to:
 
 ```env
 VITE_API_BASE_URL=http://localhost:5000/api/v1
 ```
 
-## Run MongoDB and Redis with Docker
+### 3. Create Docker network and volumes
 
-### First time only
-
-Create Docker network and volumes:
+Run this once on a new machine:
 
 ```powershell
 docker network create libero-net
@@ -85,7 +93,11 @@ docker volume create libero-mongo-data
 docker volume create libero-redis-data
 ```
 
-Run MongoDB:
+If Docker says a network or volume already exists, that is fine.
+
+### 4. Create MongoDB and Redis containers
+
+Run MongoDB as a replica set:
 
 ```powershell
 docker run -d --name libero-mongo `
@@ -105,13 +117,13 @@ docker run -d --name libero-redis `
   redis:7 redis-server --appendonly yes
 ```
 
-Initialize MongoDB replica set:
+Initialize the MongoDB replica set:
 
 ```powershell
 docker exec libero-mongo mongosh --eval "rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]})"
 ```
 
-Verify services:
+Verify both services:
 
 ```powershell
 docker ps
@@ -119,41 +131,34 @@ docker exec libero-redis redis-cli ping
 docker exec libero-mongo mongosh --eval "rs.status().ok"
 ```
 
-Expected results:
+Expected:
 
 - Redis returns `PONG`
 - Mongo returns `1`
 
-### Next runs
+### 5. Seed base data
 
-If containers already exist, do not run `docker run` again. Start them with:
+Run the normal seed:
 
 ```powershell
-docker start libero-mongo libero-redis
+npm run seed
 ```
 
-## Seed default data
+This creates or updates base data: policies, fine rates, admin account, demo members, categories, authors, books, and copies.
 
-Seed loan policies, fine rate, and the default admin account:
+Current behavior:
 
-```powershell
-cd c:\Users\ADMIN\libero
-npm run seed --workspace @libero/server
-```
+- `npm run seed` is the safe base seed. It does not reset operational demo data such as loans, reservations, book holds, fines, notifications, audit logs, or refresh tokens.
+- `npm run seed:reset-demo` is destructive demo reset. Use it only when you intentionally want to clear and recreate demo operational scenarios.
 
-Default admin credentials:
+## Running the Project
 
-- Email: `admin@library.edu`
-- Password: `Admin123!`
+Use three terminals.
 
-## Run the project locally
-
-Use this order for a normal local session.
-
-### Terminal 1: backend API
+### Terminal 1: Docker and backend
 
 ```powershell
-cd c:\Users\ADMIN\libero
+cd <path-to-Libero>
 docker start libero-mongo libero-redis
 npm run dev
 ```
@@ -164,23 +169,10 @@ Health check:
 curl http://localhost:5000/api/v1/health
 ```
 
-### Terminal 2: admin frontend
+### Terminal 2: reader UI
 
 ```powershell
-cd c:\Users\ADMIN\libero
-npm run dev:admin
-```
-
-Open:
-
-```text
-http://localhost:5173/admin/
-```
-
-### Terminal 3: reader frontend
-
-```powershell
-cd c:\Users\ADMIN\libero
+cd <path-to-Libero>
 npm run dev:reader
 ```
 
@@ -190,84 +182,83 @@ Open:
 http://localhost:5173/
 ```
 
-If the admin app is already using `5173`, Vite will usually move the reader app to the next free port, typically `5174`. Use the exact URL shown in the terminal.
-
-## Full first-time run example
-
-If someone pulls the code for the first time, these are the full commands to run in order:
+### Terminal 3: admin UI
 
 ```powershell
-git clone <your-repo-url>
-cd libero
-npm install
-Copy-Item .env.example .env
-docker network create libero-net
-docker volume create libero-mongo-data
-docker volume create libero-redis-data
-docker run -d --name libero-mongo --network libero-net -p 27017:27017 -v libero-mongo-data:/data/db mongo:7 --replSet rs0 --bind_ip_all
-docker run -d --name libero-redis --network libero-net -p 6379:6379 -v libero-redis-data:/data redis:7 redis-server --appendonly yes
-docker exec libero-mongo mongosh --eval "rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]})"
-npm run seed --workspace @libero/server
-```
-
-Then start the apps in separate terminals:
-
-```powershell
-cd c:\Users\ADMIN\libero
-npm run dev
-```
-
-```powershell
-cd c:\Users\ADMIN\libero
+cd <path-to-Libero>
 npm run dev:admin
 ```
 
-```powershell
-cd c:\Users\ADMIN\libero
-npm run dev:reader
+Open:
+
+```text
+http://localhost:5174/admin/
 ```
 
-## How to test admin and reader flows
+Both Vite apps use `strictPort: true`. If a port is already in use, stop the old process or change the port in the related `vite.config.ts`.
 
-### Admin
+## Login Accounts After Seed
 
-1. Run seed.
-2. Open `http://localhost:5173/admin/`
-3. Login with:
-   - Email: `admin@library.edu`
-   - Password: `Admin123!`
+Admin:
 
-### Reader
+- Email: `admin@library.edu`
+- Password: `Admin123!`
 
-There is no default reader account in seed. Use one of these flows:
+Librarian:
 
-Flow A:
-1. Open the reader app.
-2. Register a new account from `/register`.
-3. Login to admin UI with the default admin account.
-4. Go to Members and activate the new reader account.
-5. Login again on the reader app.
+- Email: `librarian1@library.edu`
+- Password: `Passw0rd!`
 
-Flow B:
-1. Login to admin UI.
-2. Create a member with role `student` or `lecturer`.
-3. Ensure the member status is `active`.
-4. Login to the reader app with that member account.
+Reader examples:
 
-Notes:
+- Email: `student001@library.edu`
+- Password: `Passw0rd!`
+- Email: `lecturer1@library.edu`
+- Password: `Passw0rd!`
 
-- Reader frontend is intended for `student` and `lecturer`.
-- Admin and librarian accounts are not meant to use the reader area.
-- Reservation creation is only allowed for `student` and `lecturer`.
+Admin and librarian accounts are for the admin UI. Student and lecturer accounts are for the reader UI.
 
-## Useful commands
+## Demo Data Workflow
 
-### Root shortcuts
+Use this rule when testing:
+
+- First setup or missing base data: run `npm run seed`.
+- Normal daily work: start Docker and run the apps. Do not seed again unless needed.
+- Need a clean scripted demo: run `npm run seed:reset-demo`.
+
+`seed:reset-demo` clears operational demo data:
+
+- loans
+- reservations
+- book holds
+- fines
+- notifications
+- audit logs
+- refresh tokens
+
+Because refresh tokens are cleared, any logged-in browser sessions will be invalidated.
+
+## Registering a New Reader
+
+Public registration creates an active student account. After registering in the reader UI, the user can log in immediately.
+
+For admin-created accounts:
+
+1. Log in to the admin UI.
+2. Go to Members.
+3. Create a member with role `student` or `lecturer`.
+4. Use that account in the reader UI.
+
+## Useful Commands
+
+Root shortcuts:
 
 ```powershell
 npm run dev
 npm run dev:admin
 npm run dev:reader
+npm run seed
+npm run seed:reset-demo
 npm run build
 npm run build:admin
 npm run build:reader
@@ -279,17 +270,18 @@ npm run test:admin
 npm run test:reader
 ```
 
-### Backend only
+Backend only:
 
 ```powershell
-npm run dev --workspace @libero/server
-npm run seed --workspace @libero/server
-npm run test --workspace @libero/server
-npm run typecheck --workspace @libero/server
-npm run build --workspace @libero/server
+npm run dev --workspace server
+npm run seed --workspace server
+npm run seed:reset-demo --workspace server
+npm run test --workspace server
+npm run typecheck --workspace server
+npm run build --workspace server
 ```
 
-### Admin frontend only
+Admin only:
 
 ```powershell
 npm run dev --workspace @libero/admin
@@ -298,7 +290,7 @@ npm run typecheck --workspace @libero/admin
 npm run build --workspace @libero/admin
 ```
 
-### Reader frontend only
+Reader only:
 
 ```powershell
 npm run dev --workspace @libero/reader
@@ -307,17 +299,93 @@ npm run typecheck --workspace @libero/reader
 npm run build --workspace @libero/reader
 ```
 
+## Full First-Time Command Sequence
+
+```powershell
+git clone <your-repo-url>
+cd Libero
+npm install
+Copy-Item .env.example .env
+docker network create libero-net
+docker volume create libero-mongo-data
+docker volume create libero-redis-data
+docker run -d --name libero-mongo --network libero-net -p 27017:27017 -v libero-mongo-data:/data/db mongo:7 --replSet rs0 --bind_ip_all
+docker run -d --name libero-redis --network libero-net -p 6379:6379 -v libero-redis-data:/data redis:7 redis-server --appendonly yes
+docker exec libero-mongo mongosh --eval "rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]})"
+npm run seed
+```
+
+Then start the apps in separate terminals:
+
+```powershell
+npm run dev
+```
+
+```powershell
+npm run dev:reader
+```
+
+```powershell
+npm run dev:admin
+```
+
 ## Troubleshooting
+
+### Admin or reader shows Network Error
+
+Most common cause: backend is not listening on port `5000`.
+
+Check:
+
+```powershell
+docker ps
+curl http://localhost:5000/api/v1/health
+```
+
+Fix:
+
+```powershell
+docker start libero-mongo libero-redis
+npm run dev
+```
+
+### `POST http://localhost:5000/api/v1/auth/login net::ERR_CONNECTION_REFUSED`
+
+The frontend is running, but the backend is down or failed to start. Start the backend with:
+
+```powershell
+npm run dev
+```
+
+### Mongo transaction error
+
+If you see:
+
+```text
+Transaction numbers are only allowed on a replica set member or mongos
+```
+
+Use:
+
+```env
+MONGODB_URI=mongodb://localhost:27017/libero?replicaSet=rs0
+```
+
+Then make sure the Docker Mongo container was started with `--replSet rs0` and initialized:
+
+```powershell
+docker exec libero-mongo mongosh --eval "rs.status().ok"
+```
 
 ### Docker container name already exists
 
-If `docker run` says container name is already in use:
+If `docker run` says the container name is already in use, start the existing containers:
 
 ```powershell
 docker start libero-mongo libero-redis
 ```
 
-If you want to recreate them:
+Only recreate containers if you intentionally want to replace them:
 
 ```powershell
 docker rm -f libero-mongo libero-redis
@@ -325,68 +393,44 @@ docker rm -f libero-mongo libero-redis
 
 Then run the `docker run` commands again.
 
-### Mongo container exists but is not running
-
-Check logs:
-
-```powershell
-docker logs libero-mongo --tail 100
-```
-
 ### Mongo replica set was already initialized
 
-If `rs.initiate(...)` says the replica set already exists, ignore it. Verify with:
+If `rs.initiate(...)` says the replica set already exists, ignore it and verify:
 
 ```powershell
 docker exec libero-mongo mongosh --eval "rs.status().ok"
 ```
 
-### Admin or reader UI returns `404` for `/api/v1/...` on the frontend port
+### Invalid email or password after changing demo data
 
-Make sure the frontend is using:
-
-```env
-VITE_API_BASE_URL=http://localhost:5000/api/v1
-```
-
-Then restart the related dev server:
+Run the normal seed first:
 
 ```powershell
-npm run dev:admin
+npm run seed
 ```
 
-or
+If you intentionally want to reset demo account state and passwords, run:
 
 ```powershell
-npm run dev:reader
+npm run seed:reset-demo
 ```
 
-### Seed ran successfully but admin login still fails
+Then log in again with the default credentials above.
 
-Run seed again to reset the default admin password:
+### Admin URL opens a blank or wrong page
 
-```powershell
-npm run seed --workspace @libero/server
+Use:
+
+```text
+http://localhost:5174/admin/
 ```
 
-Then login with:
+The admin app has Vite base `/admin/`.
 
-- Email: `admin@library.edu`
-- Password: `Admin123!`
+### VS Code cannot load the tsconfig schema
 
-### Reader account login fails right after register
+This warning is usually an internet/DNS issue when VS Code tries to reach SchemaStore. It does not block the project from running.
 
-That is expected if the account is still pending approval.
+### Build warning: chunk larger than 500 kB
 
-Use admin UI to activate the member account first, then login again.
-
-### Vite frontend port is different from the README
-
-When multiple Vite apps run at the same time, the second app may move to another port automatically.
-
-Examples:
-
-- Admin: `http://localhost:5173/admin/`
-- Reader: `http://localhost:5174/`
-
-Always check the exact URL printed in the terminal after `npm run dev:admin` or `npm run dev:reader`.
+Vite may warn that a generated chunk is larger than 500 kB. This is a bundle-size warning, not a compile failure.

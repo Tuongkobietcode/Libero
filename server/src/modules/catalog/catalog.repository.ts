@@ -314,7 +314,7 @@ export class CatalogRepository {
   async aggregatePopularBookIds(windowDays: number, limit: number): Promise<Types.ObjectId[]> {
     const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
     const result = await LoanRecordModel.aggregate<{ _id: Types.ObjectId; loanCount: number }>([
-      { $match: { borrowDate: { $gte: cutoff } } },
+      { $match: { checkoutDate: { $gte: cutoff } } },
       { $group: { _id: '$bookId', loanCount: { $sum: 1 } } },
       { $sort: { loanCount: -1 } },
       { $limit: limit },

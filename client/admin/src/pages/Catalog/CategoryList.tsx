@@ -15,7 +15,7 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
-import { primaryActionButtonClass } from '../../components/AdminSurface';
+import { AdminSelect, primaryActionButtonClass } from '../../components/AdminSurface';
 import { useDebounce } from '../../hooks/useDebounce';
 import { catalogApi } from '../../services/catalog.api';
 import { useNotificationsStore } from '../../store/notifications.store';
@@ -280,7 +280,7 @@ export default function CategoryListPage() {
 
           <button
             type="button"
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-extrabold text-slate-700 transition hover:border-[#3157ff] hover:text-[#3157ff]"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:border-[#3157ff] hover:text-[#3157ff]"
             onClick={resetFilters}
           >
             <ReloadOutlined />
@@ -403,8 +403,8 @@ export default function CategoryListPage() {
           </span>
 
           <div className="flex flex-wrap items-center gap-3">
-            <select
-              className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-extrabold text-slate-700 outline-none focus:border-[#3157ff] focus:ring-4 focus:ring-blue-100"
+            <AdminSelect
+              wrapperClassName="w-32"
               value={limit}
               onChange={(event) => updatePagination(1, Number(event.target.value))}
             >
@@ -413,11 +413,11 @@ export default function CategoryListPage() {
                   {pageSize} / trang
                 </option>
               ))}
-            </select>
+            </AdminSelect>
 
             <button
               type="button"
-              className="h-10 min-w-10 rounded-xl border border-slate-200 bg-white px-3 font-extrabold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+              className="h-10 min-w-10 rounded-xl border border-slate-200 bg-white px-3 font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={safePage <= 1}
               onClick={() => updatePagination(safePage - 1)}
             >
@@ -426,15 +426,15 @@ export default function CategoryListPage() {
 
             {visiblePages.map((pageItem, index) =>
               pageItem === 'ellipsis' ? (
-                <span className="px-2 font-extrabold text-slate-400" key={`ellipsis-${index}`}>
+                <span className="px-2 font-semibold text-slate-400" key={`ellipsis-${index}`}>
                   ...
                 </span>
               ) : (
                 <button
                   type="button"
-                  className={`h-10 min-w-10 rounded-xl px-3 font-extrabold transition ${
+                  className={`h-10 min-w-10 rounded-xl px-3 font-semibold transition ${
                     pageItem === safePage
-                      ? 'bg-[#3157ff] text-white shadow-[0_10px_20px_rgba(49,87,255,0.28)]'
+                      ? 'bg-white !text-[#1677ff] shadow-[0_16px_36px_rgba(22,119,255,0.14)] ring-1 ring-blue-50'
                       : 'border border-slate-200 bg-white text-slate-700 hover:border-[#3157ff] hover:text-[#3157ff]'
                   }`}
                   onClick={() => updatePagination(pageItem)}
@@ -447,7 +447,7 @@ export default function CategoryListPage() {
 
             <button
               type="button"
-              className="h-10 min-w-10 rounded-xl border border-slate-200 bg-white px-3 font-extrabold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+              className="h-10 min-w-10 rounded-xl border border-slate-200 bg-white px-3 font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={safePage >= totalPages}
               onClick={() => updatePagination(safePage + 1)}
             >

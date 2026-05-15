@@ -385,7 +385,7 @@ export default function BookDetailPage() {
                 <button
                   type="button"
                   onClick={() => setIsAddCopiesOpen(true)}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-extrabold text-indigo-700 transition hover:border-indigo-200 hover:bg-indigo-50"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-indigo-700 transition hover:border-indigo-200 hover:bg-indigo-50"
                 >
                   <PlusCircleOutlined />
                   Thêm bản sao
@@ -400,7 +400,7 @@ export default function BookDetailPage() {
                 >
                   <button
                     type="button"
-                    className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-extrabold text-rose-600 transition hover:bg-rose-100"
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
                   >
                     <EyeInvisibleOutlined />
                     Ẩn sách
@@ -409,7 +409,7 @@ export default function BookDetailPage() {
                 <button
                   type="button"
                   onClick={() => exportBookJson(book)}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-extrabold text-indigo-700 transition hover:border-indigo-200 hover:bg-indigo-50"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-indigo-700 transition hover:border-indigo-200 hover:bg-indigo-50"
                 >
                   <DownloadOutlined />
                   Xuất thông tin sách
@@ -418,7 +418,7 @@ export default function BookDetailPage() {
                   type="button"
                   disabled
                   title="Backend chưa có API lịch sử mượn theo đầu sách"
-                  className="inline-flex h-12 cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-extrabold text-slate-400"
+                  className="inline-flex h-12 cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-400"
                 >
                   <ClockCircleOutlined />
                   Xem lịch sử mượn
@@ -429,7 +429,7 @@ export default function BookDetailPage() {
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
               <div className="flex items-center justify-between gap-4">
                 <h3 className="m-0 text-lg font-extrabold text-slate-950">Thống kê nhanh</h3>
-                <span className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-extrabold text-slate-600">Dữ liệu hiện tại</span>
+                <span className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600">Dữ liệu hiện tại</span>
               </div>
               <div className="mt-5 grid gap-4 text-sm font-semibold">
                 <div className="flex items-center justify-between gap-4">

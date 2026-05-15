@@ -8,7 +8,6 @@ import {
   ReloadOutlined,
   SearchOutlined,
   TeamOutlined,
-  UserAddOutlined,
   UserSwitchOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
@@ -18,7 +17,7 @@ import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { primaryActionButtonClass } from '../../components/AdminSurface';
+import { AdminSelect, primaryActionButtonClass } from '../../components/AdminSurface';
 import { useDebounce } from '../../hooks/useDebounce';
 import { memberApi } from '../../services/member.api';
 import { useNotificationsStore } from '../../store/notifications.store';
@@ -144,9 +143,9 @@ export default function MemberListPage() {
     queryFn: () => memberApi.listMembers({ status: MemberStatus.Active, page: 1, limit: 1 }),
   });
 
-  const pendingMembersQuery = useQuery({
-    queryKey: ['members', 'metrics', MemberStatus.Pending],
-    queryFn: () => memberApi.listMembers({ status: MemberStatus.Pending, page: 1, limit: 1 }),
+  const expiredMembersQuery = useQuery({
+    queryKey: ['members', 'metrics', MemberStatus.Expired],
+    queryFn: () => memberApi.listMembers({ status: MemberStatus.Expired, page: 1, limit: 1 }),
   });
 
   const suspendedMembersQuery = useQuery({
@@ -230,7 +229,7 @@ export default function MemberListPage() {
       <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
         <StatCard icon={<TeamOutlined />} label="Tổng độc giả" value={totalMembersQuery.data?.pagination.totalItems} tone="indigo" helper="Từ API thành viên" />
         <StatCard icon={<CheckCircleOutlined />} label="Đang hoạt động" value={activeMembersQuery.data?.pagination.totalItems} tone="emerald" helper="Có thể mượn và đặt chỗ" />
-        <StatCard icon={<UserAddOutlined />} label="Chờ duyệt" value={pendingMembersQuery.data?.pagination.totalItems} tone="amber" helper="Cần kiểm tra hồ sơ" />
+        <StatCard icon={<WarningOutlined />} label="Hết hạn" value={expiredMembersQuery.data?.pagination.totalItems} tone="amber" helper="Cần gia hạn thẻ" />
         <StatCard icon={<WarningOutlined />} label="Tạm khóa" value={suspendedMembersQuery.data?.pagination.totalItems} tone="rose" helper="Không được lưu thông" />
       </div>
 
@@ -252,10 +251,11 @@ export default function MemberListPage() {
 
           <label className="block">
             <span className="mb-2 block text-xs font-bold text-slate-500">Vai trò</span>
-            <select
+            <AdminSelect
               value={role}
               onChange={(event) => updateParam('role', event.target.value)}
-              className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+              wrapperClassName="w-full"
+              className="h-11"
             >
               <option value="all">Tất cả vai trò</option>
               {Object.values(Role).map((value) => (
@@ -263,15 +263,16 @@ export default function MemberListPage() {
                   {getRoleLabel(value)}
                 </option>
               ))}
-            </select>
+            </AdminSelect>
           </label>
 
           <label className="block">
             <span className="mb-2 block text-xs font-bold text-slate-500">Trạng thái</span>
-            <select
+            <AdminSelect
               value={status}
               onChange={(event) => updateParam('status', event.target.value)}
-              className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+              wrapperClassName="w-full"
+              className="h-11"
             >
               <option value="all">Tất cả trạng thái</option>
               {Object.values(MemberStatus).map((value) => (
@@ -279,13 +280,13 @@ export default function MemberListPage() {
                   {getStatusLabel(value)}
                 </option>
               ))}
-            </select>
+            </AdminSelect>
           </label>
 
           <button
             type="button"
             onClick={resetFilters}
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-extrabold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600"
           >
             <ReloadOutlined />
             Đặt lại
@@ -298,7 +299,7 @@ export default function MemberListPage() {
             <button
               type="button"
               onClick={() => updateParam('status', value)}
-              className={`inline-flex h-9 items-center gap-2 rounded-lg border px-4 text-sm font-extrabold transition ${
+              className={`inline-flex h-9 items-center gap-2 rounded-lg border px-4 text-sm font-semibold transition ${
                 status === value ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200'
               }`}
               key={value}
@@ -416,9 +417,9 @@ export default function MemberListPage() {
                             <EditOutlined />
                           </button>
                         </Tooltip>
-                        {member.status === MemberStatus.Pending || member.status === MemberStatus.Suspended ? (
+                        {member.status === MemberStatus.Suspended ? (
                           <Popconfirm
-                            title={member.status === MemberStatus.Pending ? 'Duyệt tài khoản độc giả này?' : 'Kích hoạt lại độc giả này?'}
+                            title="Kích hoạt lại độc giả này?"
                             okText="Đồng ý"
                             cancelText="Hủy"
                             onConfirm={(event) => {
@@ -430,7 +431,7 @@ export default function MemberListPage() {
                               type="button"
                               onClick={(event) => event.stopPropagation()}
                               className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 text-slate-700 transition hover:border-emerald-200 hover:text-emerald-600"
-                              aria-label={member.status === MemberStatus.Pending ? `Duyệt tài khoản ${member.fullName}` : `Kích hoạt ${member.fullName}`}
+                              aria-label={`Kích hoạt ${member.fullName}`}
                             >
                               <UserSwitchOutlined />
                             </button>
@@ -487,31 +488,31 @@ export default function MemberListPage() {
             </p>
 
             <div className="flex flex-wrap items-center gap-3">
-              <select
+              <AdminSelect
                 value={limit}
                 onChange={(event) => updatePagination(1, Number(event.target.value))}
-                className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                wrapperClassName="w-32"
               >
                 {[10, 20, 50].map((pageSize) => (
                   <option value={pageSize} key={pageSize}>
                     {pageSize} / trang
                   </option>
                 ))}
-              </select>
+              </AdminSelect>
               <button type="button" disabled={page <= 1} onClick={() => updatePagination(page - 1)} className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-600 disabled:opacity-45">
                 ‹
               </button>
               {visiblePages.map((pageItem, index) =>
                 pageItem === 'ellipsis' ? (
-                  <span className="grid h-11 w-8 place-items-center text-sm font-extrabold text-slate-500" key={`ellipsis-${index}`}>
+                  <span className="grid h-11 w-8 place-items-center text-sm font-semibold text-slate-500" key={`ellipsis-${index}`}>
                     ...
                   </span>
                 ) : (
                   <button
                     type="button"
                     onClick={() => updatePagination(pageItem)}
-                    className={`grid h-11 min-w-11 place-items-center rounded-xl px-3 text-sm font-extrabold transition ${
-                      pageItem === page ? 'bg-indigo-600 text-white shadow-[0_10px_22px_rgba(79,70,229,0.25)]' : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600'
+                    className={`grid h-11 min-w-11 place-items-center rounded-xl px-3 text-sm font-semibold transition ${
+                      pageItem === page ? 'bg-white !text-[#1677ff] shadow-[0_16px_36px_rgba(22,119,255,0.14)] ring-1 ring-blue-50' : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600'
                     }`}
                     key={pageItem}
                   >

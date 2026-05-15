@@ -158,6 +158,7 @@ export class BookHoldService {
     this.writeAudit(actor, 'CREATE_BOOK_HOLD', 'BookHold', createdHoldId, undefined, result);
     this.publishHoldEvent('created', result);
     await this.queueHoldNotification(result, isBackofficeRole(actor?.actorRole));
+    await this.queueBackofficeHoldCreatedNotification(result, isBackofficeRole(actor?.actorRole));
 
     return result;
   }
@@ -263,6 +264,11 @@ export class BookHoldService {
     if (nextReservationId) {
       await this.queueReservationAdvancedNotification(nextReservationId);
     }
+
+    await this.queueBackofficeHoldStatusNotification(
+      result,
+      nextStatus === BookHoldStatus.Cancelled ? NotificationEvent.BookHoldCancelled : NotificationEvent.BookHoldExpired,
+    );
   }
 
   private async releaseCopyToReservationQueue(bookId: string, copyId: string, session: ClientSession): Promise<string | null> {
@@ -393,6 +399,37 @@ export class BookHoldService {
       );
     } catch (error) {
       logger.error({ err: error, holdId: hold._id }, 'Failed to enqueue book hold notification');
+    }
+  }
+
+  private async queueBackofficeHoldCreatedNotification(hold: BookHoldDetail, createdByBackoffice: boolean): Promise<void> {
+    try {
+      await notificationService.enqueueBookHoldCreatedForBackoffice(
+        hold._id,
+        hold.member.fullName,
+        hold.member.memberCardNo,
+        hold.book.title,
+        createdByBackoffice,
+      );
+    } catch (error) {
+      logger.error({ err: error, holdId: hold._id }, 'Failed to enqueue backoffice book hold notification');
+    }
+  }
+
+  private async queueBackofficeHoldStatusNotification(
+    hold: BookHoldDetail,
+    eventType: NotificationEvent.BookHoldCancelled | NotificationEvent.BookHoldExpired | NotificationEvent.BookHoldFulfilled,
+  ): Promise<void> {
+    try {
+      await notificationService.enqueueBookHoldStatusForBackoffice(
+        eventType,
+        hold._id,
+        hold.member.fullName,
+        hold.member.memberCardNo,
+        hold.book.title,
+      );
+    } catch (error) {
+      logger.error({ err: error, holdId: hold._id, eventType }, 'Failed to enqueue backoffice book hold status notification');
     }
   }
 

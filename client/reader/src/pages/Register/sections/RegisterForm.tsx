@@ -104,12 +104,13 @@ export function RegisterForm({ onRegistered }: RegisterFormProps): JSX.Element {
       await register({
         fullName: trimmedFullName,
         email: trimmedEmail,
+        phone: trimmedPhone,
         studentId: trimmedStudentId,
         password,
       });
       setRegistered(true);
       onRegistered(
-        'Đăng ký thành công. Tài khoản của bạn đang ở trạng thái chờ duyệt và cần thư viện kích hoạt.',
+        'Đăng ký thành công. Bạn có thể đăng nhập và sử dụng thư viện ngay.',
       );
     } catch (error) {
       notify({

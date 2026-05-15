@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, Empty, Modal, Popconfirm } from 'antd';
 import { useMemo, useState, type ReactNode } from 'react';
 
-import { primaryActionButtonClass } from '../../components/AdminSurface';
+import { AdminSelect, primaryActionButtonClass } from '../../components/AdminSurface';
 import { bookHoldApi } from '../../services/bookHold.api';
 import { catalogApi } from '../../services/catalog.api';
 import { loanApi } from '../../services/loan.api';
@@ -218,24 +218,25 @@ export default function BookHoldListPage() {
         <div className="flex flex-wrap items-end gap-3">
           <label className="block">
             <span className="mb-2 block text-xs font-bold text-slate-500">Trạng thái</span>
-            <select
+            <AdminSelect
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value as StatusFilter);
                 setPage(1);
               }}
-              className="h-12 w-60 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none transition focus:border-[#3157ff] focus:ring-4 focus:ring-blue-100"
+              wrapperClassName="w-60"
+              className="h-11"
             >
               <option value="all">Tất cả trạng thái</option>
               {Object.values(BookHoldStatus).map((value) => (
                 <option value={value} key={value}>{getBookHoldStatusLabel(value)}</option>
               ))}
-            </select>
+            </AdminSelect>
           </label>
           <button
             type="button"
             onClick={() => void queryClient.invalidateQueries({ queryKey: ['book-holds'] })}
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-extrabold text-slate-700 transition hover:border-blue-200 hover:text-blue-600"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:text-blue-600"
           >
             <ReloadOutlined />
             Tải lại
@@ -294,7 +295,7 @@ export default function BookHoldListPage() {
                             okButtonProps={{ loading: fulfillMutation.isPending && fulfillMutation.variables?._id === hold._id }}
                             onConfirm={() => fulfillMutation.mutate(hold)}
                           >
-                            <button className="inline-flex h-9 items-center gap-2 rounded-lg bg-emerald-50 px-4 text-sm font-extrabold text-emerald-600 transition hover:bg-emerald-100" type="button">
+                            <button className="inline-flex h-9 items-center gap-2 rounded-lg bg-emerald-50 px-4 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-100" type="button">
                               <CheckCircleOutlined />
                               Xác nhận nhận
                             </button>
@@ -307,7 +308,7 @@ export default function BookHoldListPage() {
                           okButtonProps={{ danger: true, loading: cancelMutation.isPending && cancelMutation.variables === hold._id }}
                           onConfirm={() => cancelMutation.mutate(hold._id)}
                         >
-                          <button className="h-9 rounded-lg bg-rose-50 px-4 text-sm font-extrabold text-rose-600 transition hover:bg-rose-100" type="button">
+                          <button className="h-9 rounded-lg bg-rose-50 px-4 text-sm font-semibold text-rose-600 transition hover:bg-rose-100" type="button">
                             Trả lại
                           </button>
                         </Popconfirm>
@@ -333,18 +334,18 @@ export default function BookHoldListPage() {
               Tổng số {formatNumber(pagination.totalItems)} đặt giữ
             </p>
             <div className="flex items-center gap-3">
-              <select
+              <AdminSelect
                 value={limit}
                 onChange={(event) => {
                   setLimit(Number(event.target.value));
                   setPage(1);
                 }}
-                className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none focus:border-[#3157ff] focus:ring-4 focus:ring-blue-100"
+                wrapperClassName="w-32"
               >
                 {[10, 20, 50].map((pageSize) => <option value={pageSize} key={pageSize}>{pageSize} / trang</option>)}
-              </select>
+              </AdminSelect>
               <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-600 disabled:opacity-45">‹</button>
-              <span className="text-sm font-extrabold text-slate-600">{pagination.page} / {Math.max(1, pagination.totalPages)}</span>
+              <span className="text-sm font-semibold text-slate-600">{pagination.page} / {Math.max(1, pagination.totalPages)}</span>
               <button type="button" disabled={page >= pagination.totalPages} onClick={() => setPage(page + 1)} className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-600 disabled:opacity-45">›</button>
             </div>
           </div>

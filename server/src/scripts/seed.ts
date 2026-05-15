@@ -6,6 +6,7 @@ import { AuthorModel } from '../models/Author.model';
 import { AuditLogModel } from '../models/AuditLog.model';
 import { BookModel } from '../models/Book.model';
 import { BookCopyModel } from '../models/BookCopy.model';
+import { BookHoldModel } from '../models/BookHold.model';
 import { CategoryModel } from '../models/Category.model';
 import { FineRateModel } from '../models/FineRate.model';
 import { FineRecordModel } from '../models/FineRecord.model';
@@ -31,6 +32,8 @@ const DEFAULT_ADMIN_EMAIL = 'admin@library.edu';
 const DEFAULT_ADMIN_PASSWORD = 'Admin123!';
 const DEFAULT_ADMIN_CARD_NO = 'MEM-2026-00001';
 const DEFAULT_PASSWORD = 'Passw0rd!';
+
+type SeedMode = 'base' | 'reset-demo';
 
 interface DemoMemberSeed {
   email: string;
@@ -64,6 +67,10 @@ interface BookSeed {
 interface CopyRef {
   copyId: string;
   bookId: string;
+}
+
+interface MemberSeedOptions {
+  resetAccountState: boolean;
 }
 
 const STUDENT_NAMES = [
@@ -447,6 +454,7 @@ const allModels = [
   AuthorModel,
   BookModel,
   BookCopyModel,
+  BookHoldModel,
   MemberModel,
   LoanPolicyModel,
   LoanRecordModel,
@@ -533,7 +541,7 @@ async function seedFineRate(): Promise<void> {
   );
 }
 
-async function upsertMember(seed: DemoMemberSeed & { password: string }): Promise<string> {
+async function upsertMember(seed: DemoMemberSeed & { password: string }, options: MemberSeedOptions): Promise<string> {
   const passwordHash = await bcrypt.hash(seed.password, 12);
   const joinDate = EFFECTIVE_FROM;
   const expiryDate = addDays(joinDate, 365);
@@ -575,13 +583,8 @@ async function upsertMember(seed: DemoMemberSeed & { password: string }): Promis
 
   existing.fullName = seed.fullName;
   existing.email = seed.email;
-  existing.passwordHash = passwordHash;
   existing.role = seed.role;
   existing.memberCardNo = seed.cardNo;
-  existing.status = MemberStatus.Active;
-  existing.isBlocked = false;
-  existing.failedLoginCount = 0;
-  existing.lockedUntil = null;
   existing.joinDate = existing.joinDate ?? joinDate;
   existing.expiryDate = existing.expiryDate ?? expiryDate;
   existing.studentId = seed.studentId;
@@ -591,14 +594,23 @@ async function upsertMember(seed: DemoMemberSeed & { password: string }): Promis
   existing.campus = seed.campus;
   existing.libraryBranch = seed.libraryBranch;
   existing.membershipTier = seed.membershipTier;
-  existing.lastLoginAt = addDays(DEMO_NOW, -2);
   existing.passwordUpdatedAt = existing.passwordUpdatedAt ?? EFFECTIVE_FROM;
+
+  if (options.resetAccountState) {
+    existing.passwordHash = passwordHash;
+    existing.status = MemberStatus.Active;
+    existing.isBlocked = false;
+    existing.failedLoginCount = 0;
+    existing.lockedUntil = null;
+    existing.lastLoginAt = addDays(DEMO_NOW, -2);
+  }
+
   await existing.save();
 
   return existing._id.toString();
 }
 
-async function seedAdminUser(): Promise<string> {
+async function seedAdminUser(options: MemberSeedOptions): Promise<string> {
   return upsertMember({
     email: DEFAULT_ADMIN_EMAIL,
     fullName: 'System Administrator',
@@ -609,17 +621,17 @@ async function seedAdminUser(): Promise<string> {
     campus: 'Cơ sở 1',
     libraryBranch: 'Thư viện Trung tâm',
     membershipTier: 'admin',
-  });
+  }, options);
 }
 
-async function seedDemoMembers(): Promise<Map<string, string>> {
+async function seedDemoMembers(options: MemberSeedOptions): Promise<Map<string, string>> {
   const map = new Map<string, string>();
 
   for (const m of DEMO_MEMBERS) {
     const id = await upsertMember({
       ...m,
       password: DEFAULT_PASSWORD,
-    });
+    }, options);
     map.set(m.email, id);
   }
 
@@ -704,6 +716,7 @@ async function resetDemoOperationalData(): Promise<void> {
   await Promise.all([
     LoanRecordModel.deleteMany({}),
     ReservationModel.deleteMany({}),
+    BookHoldModel.deleteMany({}),
     FineRecordModel.deleteMany({}),
     NotificationLogModel.deleteMany({}),
     AuditLogModel.deleteMany({}),
@@ -990,25 +1003,41 @@ async function seedOperationalScenarios(memberMap: Map<string, string>, libraria
   ).exec();
 }
 
-async function runSeed(): Promise<void> {
-  await connectToDatabase();
-  await ensureIndexes();
-
+async function seedBaseData(options: MemberSeedOptions): Promise<{ adminId: string; memberMap: Map<string, string> }> {
   await seedLoanPolicies();
   await seedFineRate();
-  const adminId = await seedAdminUser();
-  const memberMap = await seedDemoMembers();
+  const adminId = await seedAdminUser(options);
+  const memberMap = await seedDemoMembers(options);
 
   const categoryMap = await seedCategories();
   const authorMap = await seedAuthors();
   await seedBooksAndCopies(categoryMap, authorMap);
-  await resetDemoOperationalData();
-  await seedOperationalScenarios(memberMap, adminId);
+
+  return { adminId, memberMap };
+}
+
+function getSeedMode(): SeedMode {
+  return process.argv.includes('--reset-demo') ? 'reset-demo' : 'base';
+}
+
+async function runSeed(mode: SeedMode): Promise<void> {
+  await connectToDatabase();
+  await ensureIndexes();
+
+  const { adminId, memberMap } = await seedBaseData({
+    resetAccountState: mode === 'reset-demo',
+  });
+
+  if (mode === 'reset-demo') {
+    await resetDemoOperationalData();
+    await seedOperationalScenarios(memberMap, adminId);
+  }
 
   const [
     bookCount,
     copyCount,
     memberCount,
+    bookHoldCount,
     loanCount,
     reservationCount,
     fineCount,
@@ -1017,6 +1046,7 @@ async function runSeed(): Promise<void> {
     BookModel.countDocuments(),
     BookCopyModel.countDocuments(),
     MemberModel.countDocuments(),
+    BookHoldModel.countDocuments(),
     LoanRecordModel.countDocuments(),
     ReservationModel.countDocuments(),
     FineRecordModel.countDocuments(),
@@ -1028,16 +1058,20 @@ async function runSeed(): Promise<void> {
       bookCount,
       copyCount,
       memberCount,
+      bookHoldCount,
       loanCount,
       reservationCount,
       fineCount,
       blockedMemberCount,
+      mode,
     },
-    'Seed catalog and operations summary',
+    mode === 'reset-demo'
+      ? 'Seed base data and reset demo operations summary'
+      : 'Seed base data summary',
   );
 }
 
-void runSeed()
+void runSeed(getSeedMode())
   .then(() => {
     logger.info('Seed completed successfully');
   })

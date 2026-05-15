@@ -11,8 +11,7 @@ import {
   DownOutlined,
   FileTextOutlined,
   LockOutlined,
-  MenuOutlined,
-  MoonOutlined,
+  LogoutOutlined,
   PieChartOutlined,
   SearchOutlined,
   SettingOutlined,
@@ -21,14 +20,15 @@ import {
 } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../hooks/useAuth';
 import { useRealtime } from '../hooks/useRealtime';
 import { notificationApi } from '../services/notification.api';
 import { getRoleLabel } from '../utils/display';
 import { formatDateTime } from '../utils/format';
+import liberoIcon from '../assets/Icon/icon.svg';
 
 interface MenuItem {
   key: string;
@@ -112,6 +112,15 @@ function isActive(pathname: string, itemKey: string): boolean {
 
 function getInitial(name?: string): string {
   return name?.trim().charAt(0).toUpperCase() || 'A';
+}
+
+function AdminBrand() {
+  return (
+    <NavLink to="/" className="flex shrink-0 items-center gap-2" aria-label="LIBERO">
+      <img src={liberoIcon} alt="" className="h-9 w-9 object-contain" />
+      <span className="text-2xl font-extrabold leading-none text-brand-600">LIBERO</span>
+    </NavLink>
+  );
 }
 
 function getPageHeading(pathname: string): { title: string; subtitle?: string } {
@@ -205,6 +214,10 @@ function getPageHeading(pathname: string): { title: string; subtitle?: string } 
 
   if (pathname.startsWith('/settings/fine-rates')) {
     return { title: 'Mức phạt', subtitle: 'Quản lý mức phạt quá hạn theo thời điểm hiệu lực' };
+  }
+
+  if (pathname.startsWith('/profile')) {
+    return { title: 'Hồ sơ quản trị', subtitle: 'Thông tin tài khoản và quyền truy cập khu vực backoffice' };
   }
 
   return { title: 'Tổng quan' };
@@ -330,6 +343,88 @@ function AdminNotificationBell() {
   );
 }
 
+function AdminUserMenu({
+  user,
+  onLogout,
+}: {
+  user: NonNullable<ReturnType<typeof useAuth>['user']>;
+  onLogout: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const name = user.fullName ?? user.email ?? 'Admin';
+  const subtitle = getRoleLabel(user.role);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        className={[
+          'flex min-h-11 items-center gap-3 rounded-xl border px-2 py-1.5 transition',
+          open ? 'border-slate-200 bg-slate-50' : 'border-transparent hover:border-slate-200 hover:bg-slate-50',
+        ].join(' ')}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e8efff] text-sm font-extrabold text-[#3157ff] ring-2 ring-white">
+          {getInitial(name)}
+        </span>
+        <span className="hidden min-w-0 flex-col items-start sm:flex">
+          <span className="max-w-[150px] truncate text-sm font-extrabold text-slate-900">{name}</span>
+          <span className="max-w-[150px] truncate text-xs font-semibold text-slate-500">{subtitle}</span>
+        </span>
+        <DownOutlined className={`text-xs text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open ? (
+        <div className="absolute right-0 top-12 z-50 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.16)]" role="menu">
+          <div className="border-b border-slate-100 px-4 py-3">
+            <p className="m-0 truncate text-sm font-extrabold text-slate-900">{name}</p>
+            <p className="m-0 mt-1 truncate text-xs font-semibold text-slate-500">{user.email}</p>
+          </div>
+          <div className="py-1">
+            <Link
+              to="/profile"
+              role="menuitem"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              onClick={() => setOpen(false)}
+            >
+              <UserOutlined className="text-base" />
+              Hồ sơ của tôi
+            </Link>
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50"
+              onClick={() => {
+                setOpen(false);
+                onLogout();
+              }}
+            >
+              <LogoutOutlined className="text-base" />
+              Đăng xuất
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function AdminLayout() {
   const location = useLocation();
   const { user, logout } = useAuth();
@@ -340,15 +435,7 @@ export default function AdminLayout() {
     <div className="min-h-dvh bg-[#f7f9fc] font-sans text-[#071026]">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[280px] flex-col border-r border-slate-200 bg-white xl:flex">
         <div className="flex h-[78px] items-center justify-between px-7">
-          <NavLink to="/" className="flex items-center gap-3" aria-label="LIBERO Admin">
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#3157ff] text-xl font-extrabold text-white shadow-[0_14px_30px_rgba(49,87,255,0.22)]">
-              L
-            </span>
-            <span className="text-[1.45rem] font-extrabold tracking-tight">LIBERO</span>
-          </NavLink>
-          <button className="grid h-10 w-10 place-items-center rounded-xl text-slate-500 transition hover:bg-slate-50" type="button" aria-label="Thu gọn menu">
-            <MenuOutlined />
-          </button>
+          <AdminBrand />
         </div>
 
         <nav className="flex-1 overflow-y-auto px-4 py-3" aria-label="Điều hướng quản trị">
@@ -363,21 +450,6 @@ export default function AdminLayout() {
             </div>
           ))}
         </nav>
-
-        <div className="border-t border-slate-200 p-5">
-          <div className="flex items-center gap-3 rounded-2xl p-2">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-slate-200 text-sm font-extrabold text-slate-700">
-              {getInitial(user?.fullName ?? user?.email)}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="m-0 truncate text-sm font-extrabold text-slate-900">{user?.fullName ?? user?.email ?? 'Admin'}</p>
-              <p className="m-0 truncate text-xs text-slate-500">{getRoleLabel(user?.role)}</p>
-            </div>
-            <button className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 transition hover:bg-red-50 hover:text-red-600" type="button" onClick={() => void logout()} aria-label="Đăng xuất">
-              <DownOutlined className="text-xs" />
-            </button>
-          </div>
-        </div>
       </aside>
 
       <div className="xl:pl-[280px]">
@@ -400,9 +472,7 @@ export default function AdminLayout() {
             </label>
 
             <AdminNotificationBell />
-            <button className="grid h-11 w-11 place-items-center rounded-xl text-slate-900 transition hover:bg-slate-50" type="button" aria-label="Giao diện sáng tối">
-              <MoonOutlined className="text-xl" />
-            </button>
+            {user ? <AdminUserMenu user={user} onLogout={() => void logout()} /> : null}
           </div>
         </header>
 

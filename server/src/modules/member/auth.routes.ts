@@ -7,6 +7,7 @@ import { RedisStore } from 'rate-limit-redis';
 import { RateLimitError } from '../../common/errors/AppError';
 import { ERR } from '../../common/errors/errorCodes';
 import { sendRedisCommand } from '../../common/utils/redisCommand';
+import { env } from '../../config/env';
 import { authController } from './auth.controller';
 
 const authRouter = Router();
@@ -23,10 +24,14 @@ function createAuthRateLimiter(
     limit,
     standardHeaders: true,
     legacyHeaders: false,
-    store: new RedisStore({
-      sendCommand: (...args: string[]) => sendRedisCommand(...args),
-      prefix: `auth:${keyPrefix}:`,
-    }),
+    ...(env.NODE_ENV === 'production'
+      ? {
+          store: new RedisStore({
+            sendCommand: (...args: string[]) => sendRedisCommand(...args),
+            prefix: `auth:${keyPrefix}:`,
+          }),
+        }
+      : {}),
     handler: (req, res, next) => {
       if (!req.requestId) {
         req.requestId = req.header('x-request-id') || randomUUID();

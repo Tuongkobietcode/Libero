@@ -196,7 +196,7 @@ describe('AuthService', () => {
     expect(repository.revokeRefreshTokenFamily).toHaveBeenCalled();
   });
 
-  it('registers a pending member', async () => {
+  it('registers an active student member', async () => {
     const repository = createRepositoryMock();
     const redis = createRedisMock();
 
@@ -205,21 +205,29 @@ describe('AuthService', () => {
     repository.getNextMemberCardNo.mockResolvedValue('MEM-2026-00002');
     repository.createMember.mockResolvedValue({
       id: '507f1f77bcf86cd799439011',
-      status: MemberStatus.Pending,
+      status: MemberStatus.Active,
     } as any);
 
     const authService = new AuthService(repository, redis);
     const result = await authService.register({
       fullName: 'Reader User',
       email: 'reader@example.com',
+      phone: '0901234567',
       studentId: 'S001',
       password: 'Password1',
     });
 
     expect(result).toEqual({
       memberId: '507f1f77bcf86cd799439011',
-      status: MemberStatus.Pending,
+      status: MemberStatus.Active,
     });
+    expect(repository.createMember).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: Role.Student,
+        status: MemberStatus.Active,
+        phone: '0901234567',
+      }),
+    );
   });
 
   it('rejects register when email already exists', async () => {
@@ -255,5 +263,31 @@ describe('AuthService', () => {
     expect(result.accessToken).toBeTruthy();
     expect(result.refreshToken).toBeTruthy();
     expect(result.user._id).toBe(member.id);
+  });
+
+  it('activates legacy pending members when they login successfully', async () => {
+    const repository = createRepositoryMock();
+    const redis = createRedisMock();
+    const member = createMemberDocument({
+      status: MemberStatus.Pending,
+    });
+
+    repository.findMemberByEmail.mockResolvedValue(member);
+    repository.createRefreshToken.mockResolvedValue({} as any);
+    redis.del.mockResolvedValue(1);
+    repository.updateMemberById.mockResolvedValue();
+
+    const authService = new AuthService(repository, redis);
+    const result = await authService.login({ email: 'reader@example.com', password: 'Password1' });
+
+    expect(result.accessToken).toBeTruthy();
+    expect(repository.updateMemberById).toHaveBeenCalledWith(
+      member.id,
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          status: MemberStatus.Active,
+        }),
+      }),
+    );
   });
 });

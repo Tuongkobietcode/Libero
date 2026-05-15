@@ -2,6 +2,17 @@
 
 @theme {
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --color-brand-50: #eff5ff;
+  --color-brand-100: #dbe7fe;
+  --color-brand-200: #b9d0fd;
+  --color-brand-300: #8db1fb;
+  --color-brand-400: #5b8af7;
+  --color-brand-500: #3b6cf2;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
 }
 
 :root {
@@ -49,7 +60,31 @@ html {
   background: rgb(239 246 255);
 }
 
-.ant-select-selector,
+.ant-select:not(.ant-select-multiple) .ant-select-selector {
+  height: 2.5rem !important;
+  border-color: rgb(226 232 240) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+}
+
+.ant-select:not(.ant-select-multiple) .ant-select-selection-item,
+.ant-select:not(.ant-select-multiple) .ant-select-selection-placeholder {
+  line-height: calc(2.5rem - 2px) !important;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.ant-select .ant-select-arrow {
+  color: rgb(100 116 139);
+  font-size: 0.625rem;
+}
+
+.ant-select-focused:not(.ant-select-disabled) .ant-select-selector {
+  border-color: #1677ff !important;
+  box-shadow: 0 0 0 3px rgb(219 234 254) !important;
+}
+
+.ant-select-multiple .ant-select-selector,
 .ant-picker,
 .ant-input,
 .ant-input-number,
@@ -58,7 +93,7 @@ html {
 }
 
 .ant-btn {
-  font-weight: 800;
+  font-weight: 600;
   border-radius: 0.75rem;
 }
 

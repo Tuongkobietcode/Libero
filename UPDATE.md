@@ -467,5 +467,75 @@ Khi mở chat mới, nếu chuẩn bị sửa lớn nên chạy lại:
 - User muốn code thực tế, không chỉ giải thích.
 - User ưu tiên UI sát mockup, nhưng không đổi content nếu chỉ yêu cầu pattern/layout.
 - User không muốn dùng ảnh thật hiện tại, nhưng vẫn muốn future-proof nếu admin upload ảnh thật.
-- Khi nói về seed, nhấn mạnh `npm run seed` hiện là destructive với dữ liệu vận hành demo.
+- Khi nói về seed, trạng thái mới là: `npm run seed` không còn reset dữ liệu vận hành demo; `npm run seed:reset-demo` mới là lệnh xóa/reset loans, reservations, book holds, fines, notifications, audit logs và refresh tokens.
 
+## 10. Cập Nhật Phiên 2026-05-14
+
+### Seed / demo data
+
+- Đã refactor seed thành 2 chế độ:
+  - `npm run seed`: chỉ đảm bảo base data như policies, fine rate, admin/demo members, categories, authors, books và copies. Không xóa dữ liệu vận hành demo.
+  - `npm run seed:reset-demo`: reset dữ liệu demo có tính destructive, gồm loans, reservations, book holds, fines, notifications, audit logs và refresh tokens.
+- `BookHoldModel` đã được đưa vào nhóm reset demo để tránh case seed cũ xóa reader flow nhưng admin BookHold vẫn còn.
+- Seed thường không reset password/account state của member đang tồn tại. Việc reset tài khoản chỉ nằm trong reset-demo.
+- Kết luận vận hành: không cần chạy `npm run seed` mỗi lần mở phiên mới. Chỉ chạy khi DB thiếu base data; dùng `seed:reset-demo` khi chủ động muốn quay về demo sạch.
+
+### Auth / member registration
+
+- Đã bỏ logic sinh viên public register phải chờ duyệt:
+  - Register public tạo member `Student` với status `Active`.
+  - Login với member legacy status `Pending` sẽ auto chuyển sang `Active`.
+  - Reader register copy đã đổi sang thông báo có thể đăng nhập ngay.
+- Admin Members đã bỏ KPI/action duyệt tài khoản pending. Cột/action hiện tại giữ các hành động vận hành như xem, sửa, khóa/mở khóa, menu khác. KPI pending được thay bằng KPI hết hạn.
+- Đã sửa bug số điện thoại đăng ký không hiện trong admin:
+  - Reader register submit thêm `phone`.
+  - Shared `RegisterPayload`, backend validator/types/service nhận và lưu `phone`.
+  - Test auth đã assert phone được persist.
+
+### Admin UI polish
+
+- Đã chuẩn hóa nhiều native select/dropdown trong admin sang `AdminSelect` dùng Ant Design Select và style chung.
+- Đã đổi font weight của các action/filter buttons từ quá đậm sang `font-semibold`, gần hơn style select trong UI.
+- Đã chuẩn hóa pagination active từ nền tím/xanh đặc sang nền trắng, text xanh, border/ring xanh giống button create.
+- Đã chỉnh badge trạng thái ở màn khoản mượn/circulation để khớp pattern badge các màn khác, gồm label tiếng Việt và màu pill nhất quán.
+
+### Reader shelves
+
+- Reader home:
+  - `Sách phổ biến` lấy từ `/books/popular` với `windowDays=30`.
+  - `Gợi ý cho bạn` lấy từ endpoint recommendation theo user đang đăng nhập.
+- Backend popular books đã sửa query từ field sai `borrowDate` sang `checkoutDate` của `LoanRecord`.
+- Để 2 shelf có data:
+  - Popular cần có loan trong 30 ngày gần nhất.
+  - Recommendation cần user đăng nhập có lịch sử mượn để suy ra danh mục/tác giả liên quan.
+
+### Files liên quan trong phiên này
+
+- `server/src/scripts/seed.ts`
+- `server/src/modules/catalog/catalog.repository.ts`
+- `server/src/modules/member/auth.service.ts`
+- `server/src/modules/member/auth.validator.ts`
+- `server/src/modules/member/auth.types.ts`
+- `server/src/modules/member/authStatus.ts`
+- `server/src/models/Member.model.ts`
+- `shared/src/models.ts`
+- `client/reader/src/pages/Register/sections/RegisterForm.tsx`
+- `client/reader/src/pages/Home/sections/BookShelves.tsx`
+- `client/admin/src/components/AdminSurface.tsx`
+- `client/admin/src/pages/Members/MemberList.tsx`
+- `client/admin/src/pages/Circulation/Checkout.tsx`
+- `client/admin/src/styles.css`
+- `server/tests/unit/auth.service.test.ts`
+- `server/tests/integration/auth.test.ts`
+
+### Verification đã chạy
+
+- `npm run typecheck`
+- `npm run typecheck:admin`
+- `npm run typecheck:reader`
+- `npm run build:admin`
+- `npm run build:reader`
+- `npm run test --workspace server -- --runTestsByPath tests/unit/auth.service.test.ts`
+- `npm run test --workspace server -- --runTestsByPath tests/integration/auth.test.ts`
+
+Ghi chú: `npm run build:admin` pass nhưng Vite vẫn cảnh báo chunk lớn hơn 500kB. Đây là warning bundle size, không phải lỗi compile.

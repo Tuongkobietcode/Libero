@@ -13,7 +13,7 @@ import { Alert, Empty, Modal, Popconfirm, Tooltip } from 'antd';
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
-import { primaryActionButtonClass } from '../../components/AdminSurface';
+import { AdminSelect, primaryActionButtonClass } from '../../components/AdminSurface';
 import { catalogApi } from '../../services/catalog.api';
 import { memberApi } from '../../services/member.api';
 import { reservationApi } from '../../services/reservation.api';
@@ -370,13 +370,14 @@ export default function ReservationListPage() {
 
           <label className="block">
             <span className="mb-2 block text-xs font-bold text-slate-500">Trạng thái</span>
-            <select
+            <AdminSelect
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value as ReservationStatusFilter);
                 setPage(1);
               }}
-              className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+              wrapperClassName="w-full"
+              className="h-11"
             >
               <option value="all">Tất cả trạng thái</option>
               {Object.values(ReservationStatus).map((value) => (
@@ -384,14 +385,14 @@ export default function ReservationListPage() {
                   {getStatusLabel(value)}
                 </option>
               ))}
-            </select>
+            </AdminSelect>
           </label>
 
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
               onClick={() => searchMemberMutation.mutate(search.trim())}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-extrabold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600"
             >
               <SearchOutlined />
               Tìm
@@ -399,7 +400,7 @@ export default function ReservationListPage() {
             <button
               type="button"
               onClick={resetFilters}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-extrabold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600"
             >
               <ReloadOutlined />
               Đặt lại
@@ -472,11 +473,11 @@ export default function ReservationListPage() {
                     </td>
                     <td className="whitespace-nowrap px-5 py-4">
                       <div className="flex justify-end gap-2">
-                        <button className="h-9 rounded-lg border border-slate-200 px-4 text-sm font-extrabold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600" type="button">
+                        <button className="h-9 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600" type="button">
                           Xem chi tiết
                         </button>
                         {reservation.status === ReservationStatus.Notified ? (
-                          <span className="grid h-9 place-items-center rounded-lg bg-emerald-50 px-4 text-sm font-extrabold text-emerald-600">Thông báo nhận sách</span>
+                          <span className="grid h-9 place-items-center rounded-lg bg-emerald-50 px-4 text-sm font-semibold text-emerald-600">Thông báo nhận sách</span>
                         ) : null}
                         {[ReservationStatus.Waiting, ReservationStatus.Notified, ReservationStatus.Expired].includes(reservation.status) ? (
                           <Popconfirm
@@ -486,7 +487,7 @@ export default function ReservationListPage() {
                             okButtonProps={{ danger: true, loading: cancelMutation.isPending }}
                             onConfirm={() => cancelMutation.mutate(reservation._id)}
                           >
-                            <button className="h-9 rounded-lg bg-rose-50 px-4 text-sm font-extrabold text-rose-600 transition hover:bg-rose-100" type="button">
+                            <button className="h-9 rounded-lg bg-rose-50 px-4 text-sm font-semibold text-rose-600 transition hover:bg-rose-100" type="button">
                               Hủy
                             </button>
                           </Popconfirm>
@@ -520,34 +521,34 @@ export default function ReservationListPage() {
             </p>
 
             <div className="flex flex-wrap items-center gap-3">
-              <select
+              <AdminSelect
                 value={limit}
                 onChange={(event) => {
                   setLimit(Number(event.target.value));
                   setPage(1);
                 }}
-                className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                wrapperClassName="w-32"
               >
                 {[10, 20, 50].map((pageSize) => (
                   <option value={pageSize} key={pageSize}>
                     {pageSize} / trang
                   </option>
                 ))}
-              </select>
+              </AdminSelect>
               <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-600 disabled:opacity-45">
                 ‹
               </button>
               {visiblePages.map((pageItem, index) =>
                 pageItem === 'ellipsis' ? (
-                  <span className="grid h-11 w-8 place-items-center text-sm font-extrabold text-slate-500" key={`ellipsis-${index}`}>
+                  <span className="grid h-11 w-8 place-items-center text-sm font-semibold text-slate-500" key={`ellipsis-${index}`}>
                     ...
                   </span>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setPage(pageItem)}
-                    className={`grid h-11 min-w-11 place-items-center rounded-xl px-3 text-sm font-extrabold transition ${
-                      pageItem === page ? 'bg-indigo-600 text-white shadow-[0_10px_22px_rgba(79,70,229,0.25)]' : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600'
+                    className={`grid h-11 min-w-11 place-items-center rounded-xl px-3 text-sm font-semibold transition ${
+                      pageItem === page ? 'bg-white !text-[#1677ff] shadow-[0_16px_36px_rgba(22,119,255,0.14)] ring-1 ring-blue-50' : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600'
                     }`}
                     key={pageItem}
                   >

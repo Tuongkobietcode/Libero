@@ -242,7 +242,10 @@ export class ReservationService {
       const nextReservation = await this.getReservationDetail(nextNotifiedReservationId);
       this.writeAudit(actor, 'NOTIFY_RESERVATION', 'Reservation', nextNotifiedReservationId, undefined, nextReservation);
       await this.queueReservationNotification(nextReservation);
+      await this.queueBackofficeReservationStatusNotification(nextReservation, NotificationEvent.ReservationAdvanced);
     }
+
+    await this.queueBackofficeReservationStatusNotification(result, NotificationEvent.ReservationCancelled);
 
     return result;
   }
@@ -267,6 +270,7 @@ export class ReservationService {
     const reservation = await this.getReservationDetail(notifiedReservationId);
     this.writeAudit(actor, 'NOTIFY_RESERVATION', 'Reservation', notifiedReservationId, undefined, reservation);
     await this.queueReservationNotification(reservation);
+    await this.queueBackofficeReservationStatusNotification(reservation, NotificationEvent.ReservationAdvanced);
 
     return reservation;
   }
@@ -325,7 +329,10 @@ export class ReservationService {
       const nextReservation = await this.getReservationDetail(nextNotifiedReservationId);
       this.writeAudit(actor, 'NOTIFY_RESERVATION', 'Reservation', nextNotifiedReservationId, undefined, nextReservation);
       await this.queueReservationNotification(nextReservation);
+      await this.queueBackofficeReservationStatusNotification(nextReservation, NotificationEvent.ReservationAdvanced);
     }
+
+    await this.queueBackofficeReservationStatusNotification(result, NotificationEvent.ReservationExpired);
 
     return result;
   }
@@ -592,18 +599,40 @@ export class ReservationService {
         createdByBackoffice,
       );
 
-      if (!createdByBackoffice) {
-        await notificationService.enqueueReservationRequestedForBackoffice(
-          reservation._id,
-          reservation.member.fullName,
-          reservation.member.memberCardNo,
-          reservation.book.title,
-        );
-      }
+      await notificationService.enqueueReservationRequestedForBackoffice(
+        reservation._id,
+        reservation.member.fullName,
+        reservation.member.memberCardNo,
+        reservation.book.title,
+      );
     } catch (error) {
       logger.error(
         { err: error, reservationId: reservation._id },
         'Failed to enqueue reservation created notification',
+      );
+    }
+  }
+
+  private async queueBackofficeReservationStatusNotification(
+    reservation: ReservationDetail,
+    eventType:
+      | NotificationEvent.ReservationAdvanced
+      | NotificationEvent.ReservationCancelled
+      | NotificationEvent.ReservationExpired
+      | NotificationEvent.ReservationFulfilled,
+  ): Promise<void> {
+    try {
+      await notificationService.enqueueReservationStatusForBackoffice(
+        eventType,
+        reservation._id,
+        reservation.member.fullName,
+        reservation.member.memberCardNo,
+        reservation.book.title,
+      );
+    } catch (error) {
+      logger.error(
+        { err: error, reservationId: reservation._id, eventType },
+        'Failed to enqueue backoffice reservation status notification',
       );
     }
   }

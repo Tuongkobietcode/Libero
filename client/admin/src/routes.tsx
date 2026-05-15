@@ -19,6 +19,7 @@ import FineManagerPage from './pages/Fines/FineManager';
 import MemberDetailPage from './pages/Members/MemberDetail';
 import MemberFormPage from './pages/Members/MemberForm';
 import MemberListPage from './pages/Members/MemberList';
+import AdminProfilePage from './pages/Profile/AdminProfile';
 import ReservationListPage from './pages/Reservations/ReservationList';
 import FineStatsPage from './pages/Reports/FineStats';
 import InventoryPage from './pages/Reports/Inventory';
@@ -121,6 +122,7 @@ export const router = createBrowserRouter(
         { path: 'members/new', element: <MemberFormPage /> },
         { path: 'members/:id', element: <MemberDetailPage /> },
         { path: 'members/:id/edit', element: <MemberFormPage /> },
+        { path: 'profile', element: <AdminProfilePage /> },
         { path: 'circulation/checkout', element: <CheckoutPage /> },
         { path: 'circulation/checkout/new', element: <CreateCheckoutPage /> },
         { path: 'circulation/return', element: <ReturnPage /> },

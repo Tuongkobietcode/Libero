@@ -80,9 +80,17 @@ const eventSubjects: Record<NotificationEvent, string> = {
   [NotificationEvent.CheckoutConfirmation]: 'LIBERO - Checkout confirmation',
   [NotificationEvent.AccountBlocked]: 'LIBERO - Account blocked',
   [NotificationEvent.AccountActivated]: 'LIBERO - Account activated',
+  [NotificationEvent.MemberRegistered]: 'LIBERO - New reader registered',
   [NotificationEvent.ReservationCreated]: 'LIBERO - Reservation created',
   [NotificationEvent.ReservationRequested]: 'LIBERO - New reservation request',
+  [NotificationEvent.ReservationAdvanced]: 'LIBERO - Reservation queue advanced',
+  [NotificationEvent.ReservationCancelled]: 'LIBERO - Reservation cancelled',
+  [NotificationEvent.ReservationExpired]: 'LIBERO - Reservation expired',
+  [NotificationEvent.ReservationFulfilled]: 'LIBERO - Reservation fulfilled',
   [NotificationEvent.BookHoldCreated]: 'LIBERO - Book hold created',
+  [NotificationEvent.BookHoldCancelled]: 'LIBERO - Book hold cancelled',
+  [NotificationEvent.BookHoldExpired]: 'LIBERO - Book hold expired',
+  [NotificationEvent.BookHoldFulfilled]: 'LIBERO - Book hold fulfilled',
 };
 
 function buildLoanRenewLink(): string {
@@ -280,6 +288,94 @@ export class NotificationService {
     );
   }
 
+  async enqueueMemberRegisteredForBackoffice(
+    memberId: string,
+    fullName: string,
+    email: string,
+    memberCardNo: string,
+    now: Date = new Date(),
+  ): Promise<EnqueueEmailResult[]> {
+    return this.enqueueBackofficeNotification({
+      eventType: NotificationEvent.MemberRegistered,
+      referenceId: memberId,
+      title: 'Độc giả mới đăng ký',
+      body: `${fullName} (${memberCardNo}) vừa tạo tài khoản ${email}.`,
+      link: `/members/${memberId}`,
+      now,
+    });
+  }
+
+  async enqueueBookHoldCreatedForBackoffice(
+    holdId: string,
+    memberName: string,
+    memberCardNo: string,
+    bookTitle: string,
+    createdByBackoffice: boolean,
+    now: Date = new Date(),
+  ): Promise<EnqueueEmailResult[]> {
+    return this.enqueueBackofficeNotification({
+      eventType: NotificationEvent.BookHoldCreated,
+      referenceId: holdId,
+      title: createdByBackoffice ? 'Đặt giữ được tạo bởi thủ thư' : 'Có yêu cầu đặt giữ mới',
+      body: `${memberName} (${memberCardNo}) đang giữ sách "${bookTitle}".`,
+      link: '/book-holds',
+      now,
+    });
+  }
+
+  async enqueueBookHoldStatusForBackoffice(
+    eventType: NotificationEvent.BookHoldCancelled | NotificationEvent.BookHoldExpired | NotificationEvent.BookHoldFulfilled,
+    holdId: string,
+    memberName: string,
+    memberCardNo: string,
+    bookTitle: string,
+    now: Date = new Date(),
+  ): Promise<EnqueueEmailResult[]> {
+    const titleByEvent = {
+      [NotificationEvent.BookHoldCancelled]: 'Đặt giữ đã hủy',
+      [NotificationEvent.BookHoldExpired]: 'Đặt giữ đã hết hạn',
+      [NotificationEvent.BookHoldFulfilled]: 'Đặt giữ đã được nhận',
+    };
+
+    return this.enqueueBackofficeNotification({
+      eventType,
+      referenceId: holdId,
+      title: titleByEvent[eventType],
+      body: `${memberName} (${memberCardNo}) - "${bookTitle}".`,
+      link: '/book-holds',
+      now,
+    });
+  }
+
+  async enqueueReservationStatusForBackoffice(
+    eventType:
+      | NotificationEvent.ReservationAdvanced
+      | NotificationEvent.ReservationCancelled
+      | NotificationEvent.ReservationExpired
+      | NotificationEvent.ReservationFulfilled,
+    reservationId: string,
+    memberName: string,
+    memberCardNo: string,
+    bookTitle: string,
+    now: Date = new Date(),
+  ): Promise<EnqueueEmailResult[]> {
+    const titleByEvent = {
+      [NotificationEvent.ReservationAdvanced]: 'Đặt chỗ đã đến lượt nhận',
+      [NotificationEvent.ReservationCancelled]: 'Đặt chỗ đã hủy',
+      [NotificationEvent.ReservationExpired]: 'Đặt chỗ đã hết hạn',
+      [NotificationEvent.ReservationFulfilled]: 'Đặt chỗ đã hoàn tất',
+    };
+
+    return this.enqueueBackofficeNotification({
+      eventType,
+      referenceId: reservationId,
+      title: titleByEvent[eventType],
+      body: `${memberName} (${memberCardNo}) - "${bookTitle}".`,
+      link: '/reservations',
+      now,
+    });
+  }
+
   async enqueueBookHoldCreated(
     memberId: string,
     holdId: string,
@@ -459,6 +555,31 @@ export class NotificationService {
     };
   }
 
+  private async enqueueBackofficeNotification(params: {
+    eventType: NotificationEvent;
+    referenceId: string;
+    title: string;
+    body?: string;
+    link?: string;
+    now?: Date;
+  }): Promise<EnqueueEmailResult[]> {
+    const recipients = await this.repository.findBackofficeContacts();
+
+    return Promise.all(
+      recipients.map((recipient) =>
+        this.enqueueInAppNotification({
+          memberId: recipient._id,
+          eventType: params.eventType,
+          referenceId: params.referenceId,
+          title: params.title,
+          body: params.body,
+          link: params.link,
+          now: params.now,
+        }),
+      ),
+    );
+  }
+
   private publishNotification(memberId: string, notification: NotificationLogDocument): void {
     const item = this.toNotificationListItem(notification);
 
@@ -493,6 +614,10 @@ export class NotificationService {
       return '/my-reservations';
     }
 
+    if (eventType === NotificationEvent.MemberRegistered) {
+      return '/members';
+    }
+
     if (eventType === NotificationEvent.BookHoldCreated) {
       return '/search';
     }
@@ -501,8 +626,22 @@ export class NotificationService {
       return '/my-loans';
     }
 
-    if (eventType === NotificationEvent.ReservationRequested) {
+    if (
+      eventType === NotificationEvent.ReservationRequested ||
+      eventType === NotificationEvent.ReservationAdvanced ||
+      eventType === NotificationEvent.ReservationCancelled ||
+      eventType === NotificationEvent.ReservationExpired ||
+      eventType === NotificationEvent.ReservationFulfilled
+    ) {
       return '/reservations';
+    }
+
+    if (
+      eventType === NotificationEvent.BookHoldCancelled ||
+      eventType === NotificationEvent.BookHoldExpired ||
+      eventType === NotificationEvent.BookHoldFulfilled
+    ) {
+      return '/book-holds';
     }
 
     return undefined;

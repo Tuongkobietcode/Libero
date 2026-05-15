@@ -51,6 +51,7 @@ export interface LoginPayload {
 export interface RegisterPayload {
   fullName: string;
   email: string;
+  phone?: string;
   studentId?: string;
   password: string;
 }

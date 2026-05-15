@@ -14,6 +14,7 @@ export interface LoginDto {
 export interface RegisterDto {
   fullName: string;
   email: string;
+  phone?: string;
   studentId?: string;
   password: string;
 }

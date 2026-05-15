@@ -3,7 +3,7 @@ import { ERR } from '../../common/errors/errorCodes';
 import { MemberStatus } from '../../common/types/enums';
 
 export function canAuthenticateWithMemberStatus(status: MemberStatus): boolean {
-  return status !== MemberStatus.Pending && status !== MemberStatus.Expired;
+  return status !== MemberStatus.Expired;
 }
 
 export function resolveAuthenticationStatusError(status: MemberStatus): AuthenticationError {

@@ -78,7 +78,7 @@ const memberSchema = new Schema<Member, MemberModelType, MemberMethods>(
     status: {
       type: String,
       enum: Object.values(MemberStatus),
-      default: MemberStatus.Pending,
+      default: MemberStatus.Active,
       required: true,
     },
     isBlocked: {

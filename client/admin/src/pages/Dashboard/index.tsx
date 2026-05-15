@@ -11,6 +11,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
+import { AdminSelect } from '../../components/AdminSurface';
 import { BookCoverArt } from '../../components/BookCoverArt';
 import { catalogApi } from '../../services/catalog.api';
 import { fineApi } from '../../services/fine.api';
@@ -340,9 +341,9 @@ export default function DashboardPage() {
             <div>
               <h2 className="m-0 text-lg font-extrabold">Thống kê mượn sách</h2>
             </div>
-            <select className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 outline-none">
+            <AdminSelect wrapperClassName="min-w-36">
               <option>7 ngày qua</option>
-            </select>
+            </AdminSelect>
           </div>
           <div className="mb-2 flex items-center justify-center gap-8 text-sm font-semibold">
             <span className="inline-flex items-center gap-2"><span className="h-1 w-7 rounded-full bg-[#5b45e8]" />Số lượt mượn</span>
@@ -354,9 +355,9 @@ export default function DashboardPage() {
         <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
           <div className="mb-5 flex items-center justify-between gap-4">
             <h2 className="m-0 text-lg font-extrabold">Sách mượn nhiều nhất</h2>
-            <select className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 outline-none">
+            <AdminSelect wrapperClassName="min-w-36">
               <option>30 ngày qua</option>
-            </select>
+            </AdminSelect>
           </div>
           {popularBooks.length ? (
             <div className="space-y-4">
@@ -393,7 +394,7 @@ export default function DashboardPage() {
         <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="m-0 text-lg font-extrabold">Hoạt động gần đây</h2>
-            <button className="rounded-xl bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600" type="button">Xem tất cả</button>
+            <button className="rounded-xl bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-600" type="button">Xem tất cả</button>
           </div>
           <div className="divide-y divide-slate-100">
             {activities.length ? (
@@ -417,7 +418,7 @@ export default function DashboardPage() {
         <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="m-0 text-lg font-extrabold">Độc giả mới</h2>
-            <button className="rounded-xl bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600" type="button">Xem tất cả</button>
+            <button className="rounded-xl bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-600" type="button">Xem tất cả</button>
           </div>
           <div className="space-y-4">
             {newReaders.length ? (

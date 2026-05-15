@@ -17,8 +17,21 @@ let jobRuntime: JobRuntime | null = null;
 
 async function startServer(): Promise<void> {
   await connectToDatabase();
-  await connectToRedis();
-  jobRuntime = await registerJobs();
+
+  try {
+    await connectToRedis();
+    jobRuntime = await registerJobs();
+  } catch (error: unknown) {
+    if (env.NODE_ENV === 'production') {
+      throw error;
+    }
+
+    logger.warn(
+      { err: error },
+      'Redis unavailable; starting HTTP server without background jobs',
+    );
+    await closeRedisConnection();
+  }
 
   await new Promise<void>((resolve) => {
     server.listen(env.PORT, () => {

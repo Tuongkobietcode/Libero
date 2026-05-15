@@ -445,22 +445,24 @@ describe('Auth integration', () => {
     expect(response.body.data.accessToken).toBeTruthy();
   });
 
-  it('registers a member in pending status', async () => {
+  it('registers an active student member', async () => {
     const response = await request(app)
       .post('/api/v1/auth/register')
       .send({
         fullName: 'New Reader',
         email: 'new-reader@example.com',
+        phone: '0901234567',
         studentId: 'S1001',
         password: 'Password1',
       })
       .expect(201);
 
     expect(response.body.success).toBe(true);
-    expect(response.body.data.status).toBe(MemberStatus.Pending);
+    expect(response.body.data.status).toBe(MemberStatus.Active);
 
     const member = await MemberModel.findOne({ email: 'new-reader@example.com' }).exec();
-    expect(member?.status).toBe(MemberStatus.Pending);
+    expect(member?.status).toBe(MemberStatus.Active);
+    expect(member?.phone).toBe('0901234567');
   });
 
   it('rate limits register requests after five attempts from the same IP', async () => {

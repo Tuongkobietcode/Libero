@@ -6,9 +6,11 @@ import mongoose from 'mongoose';
 
 import { AuthenticationError, BusinessRuleError, ConflictError, RateLimitError } from '../../common/errors/AppError';
 import { ERR } from '../../common/errors/errorCodes';
+import { logger } from '../../common/middleware/requestLogger';
 import { MemberStatus, Role } from '../../common/types/enums';
 import { invalidateMemberCache } from '../../common/utils/memberCache';
 import { env } from '../../config/env';
+import { notificationService } from '../notification/notification.service';
 import { assertCanAuthenticateWithMemberStatus } from './authStatus';
 import type {
   AuthRepository,
@@ -69,12 +71,15 @@ export class AuthService {
       fullName: input.fullName,
       email: normalizedEmail,
       passwordHash,
+      phone: input.phone,
       studentId: input.studentId,
       role: Role.Student,
       memberCardNo,
-      status: MemberStatus.Pending,
+      status: MemberStatus.Active,
       passwordUpdatedAt: new Date(),
     });
+
+    await this.enqueueMemberRegisteredNotification(member.id, member.fullName, member.email, member.memberCardNo);
 
     return {
       memberId: member.id,
@@ -104,7 +109,12 @@ export class AuthService {
 
     await this.resetFailedLogin(member.id, normalizedEmail);
 
-    await this.repository.updateMemberById(member.id, { $set: { lastLoginAt: new Date() } });
+    await this.repository.updateMemberById(member.id, {
+      $set: {
+        lastLoginAt: new Date(),
+        ...(member.status === MemberStatus.Pending ? { status: MemberStatus.Active } : {}),
+      },
+    });
 
     const tokens = await this.issueTokenPair(member.id, member.role);
 
@@ -296,5 +306,18 @@ export class AuthService {
         lockedUntil: null,
       },
     });
+  }
+
+  private async enqueueMemberRegisteredNotification(
+    memberId: string,
+    fullName: string,
+    email: string,
+    memberCardNo: string,
+  ): Promise<void> {
+    try {
+      await notificationService.enqueueMemberRegisteredForBackoffice(memberId, fullName, email, memberCardNo);
+    } catch (error) {
+      logger.error({ err: error, memberId }, 'Failed to enqueue member registered notification');
+    }
   }
 }

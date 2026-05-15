@@ -16,6 +16,10 @@ function invalidateAdminQueries(queryClient: ReturnType<typeof useQueryClient>, 
   if (
     eventType === NotificationEvent.ReservationRequested ||
     eventType === NotificationEvent.ReservationCreated ||
+    eventType === NotificationEvent.ReservationAdvanced ||
+    eventType === NotificationEvent.ReservationCancelled ||
+    eventType === NotificationEvent.ReservationExpired ||
+    eventType === NotificationEvent.ReservationFulfilled ||
     eventType === NotificationEvent.BookAvailable ||
     eventType === NotificationEvent.HoldExpiring
   ) {
@@ -23,7 +27,12 @@ function invalidateAdminQueries(queryClient: ReturnType<typeof useQueryClient>, 
     void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   }
 
-  if (eventType === NotificationEvent.BookHoldCreated) {
+  if (
+    eventType === NotificationEvent.BookHoldCreated ||
+    eventType === NotificationEvent.BookHoldCancelled ||
+    eventType === NotificationEvent.BookHoldExpired ||
+    eventType === NotificationEvent.BookHoldFulfilled
+  ) {
     void queryClient.invalidateQueries({ queryKey: ['book-holds'] });
     void queryClient.invalidateQueries({ queryKey: ['catalog'] });
     void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -39,7 +48,11 @@ function invalidateAdminQueries(queryClient: ReturnType<typeof useQueryClient>, 
     void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   }
 
-  if (eventType === NotificationEvent.AccountActivated || eventType === NotificationEvent.AccountBlocked) {
+  if (
+    eventType === NotificationEvent.AccountActivated ||
+    eventType === NotificationEvent.AccountBlocked ||
+    eventType === NotificationEvent.MemberRegistered
+  ) {
     void queryClient.invalidateQueries({ queryKey: ['members'] });
     void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   }

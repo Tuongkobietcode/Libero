@@ -12,6 +12,7 @@ import {
   FineStatus,
   LoanStatus,
   MemberStatus,
+  NotificationEvent,
   Role,
 } from '../../common/types/enums';
 import { writeAuditLog } from '../../common/utils/auditLogger';
@@ -119,6 +120,8 @@ export class LoanService {
     const now = new Date();
     const session = await mongoose.startSession();
     let createdLoanId: string | null = null;
+    let fulfilledReservationId: string | null = null;
+    let fulfilledBookHoldId: string | null = null;
 
     try {
       await session.withTransaction(async () => {
@@ -235,10 +238,12 @@ export class LoanService {
 
         if (reservationId) {
           await this.repository.fulfillReservationById(reservationId, session);
+          fulfilledReservationId = reservationId;
         }
 
         if (bookHoldId) {
           await this.repository.fulfillBookHoldById(bookHoldId, now, session);
+          fulfilledBookHoldId = bookHoldId;
         }
       });
     } finally {
@@ -253,6 +258,7 @@ export class LoanService {
 
     this.writeAudit(actor, 'CHECKOUT', 'LoanRecord', createdLoanId, undefined, result);
     await this.enqueueCheckoutNotification(result);
+    await this.enqueueBackofficeFulfillmentNotifications(result, fulfilledReservationId, fulfilledBookHoldId);
 
     return result;
   }
@@ -761,6 +767,36 @@ export class LoanService {
       );
     } catch (error) {
       logger.error({ err: error, loanId: loan._id }, 'Failed to enqueue checkout confirmation');
+    }
+  }
+
+  private async enqueueBackofficeFulfillmentNotifications(
+    loan: LoanDetail,
+    reservationId: string | null,
+    bookHoldId: string | null,
+  ): Promise<void> {
+    try {
+      if (reservationId) {
+        await notificationService.enqueueReservationStatusForBackoffice(
+          NotificationEvent.ReservationFulfilled,
+          reservationId,
+          loan.member.fullName,
+          loan.member.memberCardNo,
+          loan.book.title,
+        );
+      }
+
+      if (bookHoldId) {
+        await notificationService.enqueueBookHoldStatusForBackoffice(
+          NotificationEvent.BookHoldFulfilled,
+          bookHoldId,
+          loan.member.fullName,
+          loan.member.memberCardNo,
+          loan.book.title,
+        );
+      }
+    } catch (error) {
+      logger.error({ err: error, loanId: loan._id, reservationId, bookHoldId }, 'Failed to enqueue backoffice fulfillment notification');
     }
   }
 

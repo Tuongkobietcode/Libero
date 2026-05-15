@@ -8,6 +8,8 @@ type RedisHealthStatus = 'connected' | 'connecting' | 'disconnected';
 const redis = new IORedis(env.REDIS_URL, {
   lazyConnect: true,
   maxRetriesPerRequest: null,
+  retryStrategy: () => null,
+  enableOfflineQueue: false,
 });
 
 let listenersBound = false;
