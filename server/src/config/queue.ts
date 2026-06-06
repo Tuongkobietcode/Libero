@@ -4,6 +4,7 @@ import { env } from './env';
 
 const redisUrl = new URL(env.REDIS_URL);
 const redisDatabase = redisUrl.pathname ? Number(redisUrl.pathname.slice(1) || '0') : 0;
+const shouldPreferIpv4ForLocalRedis = ['localhost', '127.0.0.1', '::1'].includes(redisUrl.hostname);
 
 export const queueConnection: ConnectionOptions = {
   host: redisUrl.hostname,
@@ -12,6 +13,8 @@ export const queueConnection: ConnectionOptions = {
   password: redisUrl.password || undefined,
   db: Number.isNaN(redisDatabase) ? 0 : redisDatabase,
   tls: redisUrl.protocol === 'rediss:' ? {} : undefined,
+  connectTimeout: 5_000,
+  family: shouldPreferIpv4ForLocalRedis ? 4 : undefined,
   maxRetriesPerRequest: null,
 };
 

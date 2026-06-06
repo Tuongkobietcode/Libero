@@ -5,8 +5,14 @@ import { env } from './env';
 
 type RedisHealthStatus = 'connected' | 'connecting' | 'disconnected';
 
+function shouldPreferIpv4ForLocalRedis(uri: string): boolean {
+  return uri.includes('localhost') || uri.includes('127.0.0.1') || uri.includes('[::1]');
+}
+
 const redis = new IORedis(env.REDIS_URL, {
   lazyConnect: true,
+  connectTimeout: 5_000,
+  family: shouldPreferIpv4ForLocalRedis(env.REDIS_URL) ? 4 : undefined,
   maxRetriesPerRequest: null,
   retryStrategy: () => null,
   enableOfflineQueue: false,

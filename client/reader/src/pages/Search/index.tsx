@@ -8,8 +8,8 @@ import { useDebounce } from '../../hooks/useDebounce';
 import { catalogApi } from '../../services/catalog.api';
 import { queryKeys } from '../../lib/queryKeys';
 
-import { SearchFilters } from './sections/SearchFilters';
-import { SearchResults, type ViewMode } from './sections/SearchResults';
+import { SearchFilters } from './components/SearchFilters';
+import { SearchResults, type ViewMode } from './components/SearchResults';
 
 const PAGE_SIZE = 12;
 
@@ -65,46 +65,50 @@ export default function SearchPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card padding="md">
+      <Card padding="md" className="rounded-3xl">
         <div className="mb-4">
           <h1 className="text-2xl font-extrabold text-slate-900">{heading}</h1>
           <p className="mt-1 text-sm text-slate-500">
             Lọc theo chủ đề, tình trạng và từ khóa để tìm đầu sách phù hợp.
           </p>
         </div>
-        <SearchBar
-          defaultValue={query}
-          placeholder="Tìm sách theo tên, tác giả, ISBN..."
-          size="lg"
-          onSubmit={(value) => {
-            setQuery(value);
-            setPage(1);
-            navigate(`/search${value ? `?q=${encodeURIComponent(value)}` : ''}`, { replace: true });
-          }}
-        />
+        <div className="flex gap-3">
+          <SearchBar
+            defaultValue={query}
+            placeholder="Tìm sách theo tên, tác giả, ISBN..."
+            size="lg"
+            className="min-w-0 flex-1"
+            trailing={
+              <SearchFilters
+                facets={facetsQuery.data}
+                facetsLoading={facetsQuery.isLoading}
+                category={category}
+                availableOnly={availableOnly}
+                onCategoryChange={(next) => {
+                  setCategory(next);
+                  setPage(1);
+                }}
+                onAvailableChange={(next) => {
+                  setAvailableOnly(next);
+                  setPage(1);
+                }}
+                onReset={() => {
+                  setCategory('');
+                  setAvailableOnly(false);
+                  setPage(1);
+                }}
+              />
+            }
+            onSubmit={(value) => {
+              setQuery(value);
+              setPage(1);
+              navigate(`/search${value ? `?q=${encodeURIComponent(value)}` : ''}`, { replace: true });
+            }}
+          />
+        </div>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <SearchFilters
-          facets={facetsQuery.data}
-          facetsLoading={facetsQuery.isLoading}
-          category={category}
-          availableOnly={availableOnly}
-          onCategoryChange={(next) => {
-            setCategory(next);
-            setPage(1);
-          }}
-          onAvailableChange={(next) => {
-            setAvailableOnly(next);
-            setPage(1);
-          }}
-          onReset={() => {
-            setCategory('');
-            setAvailableOnly(false);
-            setPage(1);
-          }}
-        />
-
+      <div className="min-w-0">
         <SearchResults
           result={booksQuery.data}
           isLoading={booksQuery.isLoading}

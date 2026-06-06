@@ -10,6 +10,7 @@ import { CopyStatus, LoanStatus, MemberStatus, Role } from '../types/models';
 
 const listMyLoansMock = vi.fn();
 const renewLoanMock = vi.fn();
+const getBookMock = vi.fn();
 
 vi.mock('../services/loan.api', () => ({
   loanApi: {
@@ -18,10 +19,18 @@ vi.mock('../services/loan.api', () => ({
   },
 }));
 
+vi.mock('../services/catalog.api', () => ({
+  catalogApi: {
+    getBook: (...args: unknown[]) => getBookMock(...args),
+  },
+}));
+
 describe('MyLoansPage', () => {
   beforeEach(() => {
     listMyLoansMock.mockReset();
     renewLoanMock.mockReset();
+    getBookMock.mockReset();
+    getBookMock.mockResolvedValue({ coverImage: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=400&auto=format&fit=crop' });
 
     useAuthStore.setState({
       accessToken: 'reader-token',

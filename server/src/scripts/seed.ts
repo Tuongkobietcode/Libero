@@ -32,6 +32,7 @@ const DEFAULT_ADMIN_EMAIL = 'admin@library.edu';
 const DEFAULT_ADMIN_PASSWORD = 'Admin123!';
 const DEFAULT_ADMIN_CARD_NO = 'MEM-2026-00001';
 const DEFAULT_PASSWORD = 'Passw0rd!';
+const DEFAULT_BOOK_COVER_IMAGE = 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=400&auto=format&fit=crop';
 
 type SeedMode = 'base' | 'reset-demo';
 
@@ -59,6 +60,7 @@ interface BookSeed {
   bookValue: number;
   copies: number;
   description?: string;
+  coverImage?: string;
   language?: string;
   pageCount?: number;
   bookSize?: string;
@@ -449,6 +451,114 @@ const BOOKS: BookSeed[] = [
   },
 ];
 
+const BOOK_DISPLAY_CONTENT: Record<string, Pick<BookSeed, 'coverImage' | 'description'>> = {
+  '9780132350884': {
+    coverImage: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Cẩm nang thực hành viết mã rõ ràng, dễ đọc và dễ bảo trì cho các nhóm phát triển phần mềm.\n\nTóm tắt: Cuốn sách đi qua cách đặt tên, tổ chức hàm, xử lý lỗi, viết test và cải thiện cấu trúc mã. Trọng tâm là biến code thành tài sản lâu dài thay vì gánh nặng kỹ thuật.',
+  },
+  '9780134494166': {
+    coverImage: 'https://images.unsplash.com/photo-1518005020951-eccb494ad742?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Hướng dẫn thiết kế kiến trúc phần mềm có ranh giới rõ, phụ thuộc có kiểm soát và khả năng thay đổi cao.\n\nTóm tắt: Robert C. Martin giải thích nguyên tắc tách lớp, dependency rule, use case và cách bảo vệ nghiệp vụ lõi khỏi framework, database hoặc giao diện bên ngoài.',
+  },
+  '9780201485677': {
+    coverImage: 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Tài liệu nền tảng về cải thiện thiết kế mã nguồn hiện hữu thông qua các bước nhỏ, có kiểm chứng.\n\nTóm tắt: Martin Fowler trình bày catalog refactoring, dấu hiệu code smell và quy trình thay đổi an toàn để hệ thống dễ đọc, dễ mở rộng mà vẫn giữ nguyên hành vi.',
+  },
+  '9780321125217': {
+    coverImage: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Tác phẩm kinh điển về mô hình hóa nghiệp vụ phức tạp bằng ngôn ngữ chung giữa kỹ thuật và domain expert.\n\nTóm tắt: Cuốn sách dẫn dắt từ ubiquitous language, entity, value object, aggregate đến bounded context, giúp phần mềm phản ánh đúng cấu trúc nghiệp vụ thật.',
+  },
+  '9780321751041': {
+    coverImage: 'https://images.unsplash.com/photo-1509228468518-180dd4864904?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Khảo luận sâu về thuật toán, cấu trúc dữ liệu và tư duy phân tích nền tảng của khoa học máy tính.\n\nTóm tắt: Donald Knuth kết hợp toán học, lập trình và phân tích độ phức tạp để xây dựng nền móng bền vững cho người học thuật toán ở cấp độ nghiêm túc.',
+  },
+  '9780134610993': {
+    coverImage: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Giáo trình toàn diện về trí tuệ nhân tạo hiện đại, từ tìm kiếm, suy luận đến học máy và tác tử thông minh.\n\nTóm tắt: Sách hệ thống hóa các bài toán AI cốt lõi, mô hình ra quyết định, biểu diễn tri thức và kỹ thuật học từ dữ liệu trong một khung lý thuyết chặt chẽ.',
+  },
+  '9781492032649': {
+    coverImage: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Sổ tay định hướng chiến lược cho các dự án machine learning thực tế, nhấn mạnh cách ưu tiên lỗi và dữ liệu.\n\nTóm tắt: Andrew Ng giải thích cách phân tích bias/variance, chia tập dữ liệu, đặt metric và quyết định bước tiếp theo khi mô hình chưa đạt kỳ vọng.',
+  },
+  '9780062316097': {
+    coverImage: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Bức tranh rộng về lịch sử loài người, từ cách Homo sapiens hình thành xã hội đến các hệ thống niềm tin hiện đại.\n\nTóm tắt: Yuval Noah Harari kể lại các cuộc cách mạng nhận thức, nông nghiệp, khoa học và kinh tế để lý giải vì sao con người có thể hợp tác ở quy mô lớn.',
+  },
+  '9780199535927': {
+    coverImage: 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Tác phẩm kinh tế học cổ điển về phân công lao động, thị trường, giá trị và vai trò của nhà nước.\n\nTóm tắt: Adam Smith phân tích cơ chế vận hành của sản xuất, thương mại và của cải quốc gia, đặt nền móng cho nhiều tranh luận kinh tế hiện đại.',
+  },
+  '9786041135222': {
+    coverImage: 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Câu chuyện trong trẻo về ký ức tuổi thơ, tình bạn và những nghịch ngợm vụng dại nhưng đáng nhớ.\n\nTóm tắt: Nguyễn Nhật Ánh dẫn người đọc trở lại thế giới trẻ nhỏ, nơi những chuyện bình thường như trường lớp, gia đình và bạn bè trở thành miền ký ức dịu dàng.',
+  },
+  '9786041175327': {
+    coverImage: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Tiểu thuyết giàu hoài niệm về tình yêu đầu đời, làng quê và những lựa chọn để lại dư âm dài lâu.\n\nTóm tắt: Câu chuyện Ngạn và Hà Lan mở ra một thế giới vừa đẹp vừa buồn, nơi sự trong trẻo của tuổi trẻ đối diện với khoảng cách, tiếc nuối và trưởng thành.',
+  },
+  '9786042091237': {
+    coverImage: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Truyện thiếu nhi kinh điển theo chân Dế Mèn qua những chuyến phiêu lưu và bài học trưởng thành.\n\nTóm tắt: Tô Hoài dùng thế giới côn trùng sinh động để kể về lòng dũng cảm, sự kiêu ngạo, tình bạn và trách nhiệm với cộng đồng.',
+  },
+  '9786043788464': {
+    coverImage: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Sách kỹ năng thực tế về cách xây dựng thói quen nhỏ để tạo thay đổi lớn và bền vững.\n\nTóm tắt: James Clear trình bày bốn bước hình thành thói quen, thiết kế môi trường và cải thiện 1% mỗi ngày để biến mục tiêu thành hệ thống hành động.',
+  },
+  '9786047795925': {
+    coverImage: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Tiểu thuyết ngụ ngôn về hành trình theo đuổi giấc mơ, lắng nghe trực giác và nhận ra kho báu của riêng mình.\n\nTóm tắt: Paulo Coelho kể chuyến đi của chàng chăn cừu Santiago qua sa mạc, nơi mỗi dấu hiệu và cuộc gặp đều dẫn cậu đến một bài học về số phận.',
+  },
+  '9786043230116': {
+    coverImage: 'https://images.unsplash.com/photo-1521791136064-7986c2920216?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Cẩm nang giao tiếp kinh điển về cách tạo thiện cảm, lắng nghe và xây dựng quan hệ bền vững.\n\nTóm tắt: Dale Carnegie đưa ra những nguyên tắc ứng xử thực tế, giúp người đọc hiểu nhu cầu được tôn trọng của người khác và giao tiếp có sức ảnh hưởng hơn.',
+  },
+  '9780441172719': {
+    coverImage: 'https://images.unsplash.com/photo-1509316785289-025f5b846b35?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Thiên sử thi khoa học viễn tưởng về chính trị, sinh thái, tôn giáo và quyền lực trên hành tinh sa mạc Arrakis.\n\nTóm tắt: Frank Herbert xây dựng cuộc đấu của các gia tộc quanh nguồn tài nguyên spice, đồng thời theo dõi hành trình Paul Atreides bước vào định mệnh nguy hiểm.',
+  },
+  '9786043441178': {
+    coverImage: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Khảo cứu nổi tiếng về hai hệ thống tư duy: trực giác nhanh và suy luận chậm, cẩn trọng.\n\nTóm tắt: Daniel Kahneman phân tích các thiên kiến nhận thức, cách con người ra quyết định và lý do trí óc thường tự tin ngay cả khi phán đoán sai.',
+  },
+  '9786043928433': {
+    coverImage: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Sách tâm lý ứng dụng giúp quan sát hành vi, ngôn ngữ cơ thể và tín hiệu giao tiếp trong đời sống thường ngày.\n\nTóm tắt: David J. Lieberman gợi ý cách đọc bối cảnh, nhận diện động cơ và phản ứng hợp lý hơn khi tương tác với người khác.',
+  },
+  '9786043928440': {
+    coverImage: 'https://images.unsplash.com/photo-1493836512294-502baa1986e2?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Hướng dẫn thoát khỏi vòng lặp suy nghĩ quá mức, lo âu và trì hoãn bằng các kỹ thuật quản trị tâm trí.\n\nTóm tắt: Nick Trenton tập trung vào cách nhận diện overthinking, giảm nhiễu tinh thần và chuyển sự chú ý sang hành động cụ thể, vừa sức.',
+  },
+  '9781538139504': {
+    coverImage: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=400&auto=format&fit=crop',
+    description:
+      'Bộ công cụ rèn luyện tư duy phản biện qua câu hỏi, lập luận, bằng chứng và tự đánh giá giả định.\n\nTóm tắt: Richard Paul cung cấp phương pháp phân tích vấn đề, nhận diện thành kiến và xây dựng lập luận rõ ràng hơn trong học tập lẫn công việc.',
+  },
+};
+
+for (const book of BOOKS) {
+  Object.assign(book, BOOK_DISPLAY_CONTENT[book.isbn] ?? { coverImage: DEFAULT_BOOK_COVER_IMAGE });
+}
+
+
 const allModels = [
   CategoryModel,
   AuthorModel,
@@ -687,6 +797,7 @@ async function seedBooksAndCopies(
           publishYear: b.publishYear,
           bookValue: b.bookValue,
           description: b.description,
+          coverImage: b.coverImage ?? DEFAULT_BOOK_COVER_IMAGE,
           language: b.language ?? 'Tiếng Việt',
           pageCount: b.pageCount ?? 320,
           bookSize: b.bookSize ?? '15.5 x 23 cm',

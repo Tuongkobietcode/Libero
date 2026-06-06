@@ -69,6 +69,7 @@ export interface CsvImportRow {
   publisher?: string;
   publishYear?: number;
   description?: string;
+  coverImage?: string;
 }
 
 export interface BookNameRef {

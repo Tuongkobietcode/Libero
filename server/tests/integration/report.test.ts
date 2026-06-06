@@ -408,6 +408,15 @@ describe('Report Phase 7 integration', () => {
       dueDate: new Date('2026-04-11T00:00:00.000Z'),
       status: LoanStatus.Active,
     });
+    await createLoanRecord({
+      memberId: borrower.id,
+      bookId: book.book.id,
+      copyId: book.copy.id,
+      checkoutDate: new Date('2026-03-30T10:00:00.000Z'),
+      dueDate: new Date('2026-04-10T00:00:00.000Z'),
+      status: LoanStatus.Returned,
+      returnDate: new Date('2026-04-02T09:00:00.000Z'),
+    });
     const token = await loginAs(librarian.email, 'Password1');
 
     const response = await request(app)
@@ -418,6 +427,10 @@ describe('Report Phase 7 integration', () => {
     expect(response.body.data).toHaveLength(2);
     expect(response.body.data[0].period).toBe('2026-04-01');
     expect(response.body.data[0].totalLoans).toBe(1);
+    expect(response.body.data[0].returnedLoans).toBe(0);
+    expect(response.body.data[1].period).toBe('2026-04-02');
+    expect(response.body.data[1].totalLoans).toBe(1);
+    expect(response.body.data[1].returnedLoans).toBe(1);
   });
 
   it('returns only OVERDUE loans on GET /reports/overdue', async () => {

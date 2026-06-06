@@ -10,6 +10,7 @@ import {
   suspendMemberSchema,
   updateLoanPolicySchema,
   updateMemberSchema,
+  updateMyProfileSchema,
 } from './member.validator';
 
 function buildActor(req: Request) {
@@ -52,6 +53,16 @@ export class MemberController {
   async getMyActivities(req: Request, res: Response): Promise<void> {
     const query = myActivitiesQuerySchema.parse(req.query);
     const result = await memberService.getMyActivities(req.user?._id ?? '', query.limit ?? 10);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  }
+
+  async updateMyProfile(req: Request, res: Response): Promise<void> {
+    const input = updateMyProfileSchema.parse(req.body);
+    const result = await memberService.updateMyProfile(req.user?._id ?? '', input, buildActor(req));
 
     res.status(200).json({
       success: true,

@@ -301,7 +301,6 @@ describe('LoanService', () => {
       expect.arrayContaining([
         expect.objectContaining({ amount: 5000 }),
       ]),
-      expect.anything(),
     );
     expect((repository.createFineRecords.mock.calls[0]?.[0] as unknown[])).toHaveLength(3);
     expect(repository.findFineRatesEffectiveOnOrBefore).toHaveBeenCalledTimes(1);
@@ -405,7 +404,6 @@ describe('LoanService', () => {
         expect.objectContaining({ amount: 7000, overdueDate: new Date('2026-04-12T00:00:00.000Z') }),
         expect.objectContaining({ amount: 7000, overdueDate: new Date('2026-04-13T00:00:00.000Z') }),
       ],
-      expect.anything(),
     );
   });
 });

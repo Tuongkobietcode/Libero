@@ -39,6 +39,16 @@ export interface UpdateManagedMemberDto {
   membershipTier?: string;
 }
 
+export interface UpdateMyProfileDto {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  studentId?: string;
+  faculty?: string;
+  className?: string;
+  campus?: string;
+}
+
 export interface ListMembersQuery {
   q?: string;
   role?: Role;

@@ -63,6 +63,7 @@ export interface FineBookRef {
   isbn: string;
   title: string;
   bookValue?: number;
+  coverImage?: string;
   authors: BookNameRef[];
 }
 

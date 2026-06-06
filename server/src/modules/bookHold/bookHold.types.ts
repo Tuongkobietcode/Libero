@@ -39,6 +39,7 @@ export interface BookHoldBookRef {
   isbn: string;
   title: string;
   bookValue?: number;
+  coverImage?: string;
   authors: BookNameRef[];
   categories: BookNameRef[];
 }

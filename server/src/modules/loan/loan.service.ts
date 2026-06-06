@@ -80,6 +80,7 @@ function createLoanBookRef(book: BookDocument, authors: BookNameRef[]): LoanBook
     isbn: book.isbn,
     title: book.title,
     bookValue: book.bookValue,
+    coverImage: book.coverImage,
     authors,
   };
 }
@@ -542,49 +543,6 @@ export class LoanService {
           throw new BusinessRuleError(ERR.LOAN_ALREADY_RETURNED, 422, 'Loan has already been returned');
         }
 
-        const overdueDates = buildOverdueDates(currentLoan.dueDate, now);
-
-        if (overdueDates.length > 0) {
-          const latestOverdueDate = overdueDates.at(-1);
-
-          if (!latestOverdueDate) {
-            throw new BusinessRuleError(ERR.COMMON_BAD_REQUEST, 422, 'Overdue fine calculation failed');
-          }
-
-          const fineRates = await this.repository.findFineRatesEffectiveOnOrBefore(latestOverdueDate, session);
-          const fineRecords: Array<{
-            loanId: Types.ObjectId;
-            memberId: Types.ObjectId;
-            overdueDate: Date;
-            amount: number;
-            status: FineStatus;
-            note: string;
-          }> = [];
-
-          for (const overdueDate of overdueDates) {
-            const fineRate = getApplicableFineRate(fineRates, overdueDate);
-
-            fineRecords.push({
-              loanId: returnedLoan._id,
-              memberId: returnedLoan.memberId,
-              overdueDate,
-              amount: fineRate.ratePerDay,
-              status: FineStatus.Unpaid,
-              note: 'Quá hạn',
-            });
-          }
-
-          try {
-            await this.repository.createFineRecords(fineRecords, session);
-          } catch (error) {
-            if (!isDuplicateKeyError(error)) {
-              throw error;
-            }
-          }
-
-          blockChange = await recalculateMemberBlock(member._id.toString(), this.repository, session);
-        }
-
         const waitingReservation = await this.repository.findWaitingReservationByBookId(currentLoan.bookId, session);
 
         if (waitingReservation) {
@@ -630,6 +588,8 @@ export class LoanService {
       await session.endSession();
     }
 
+    blockChange = await this.createOverdueFineRecordsForReturnedLoan(currentLoan, now);
+
     const returnBlockChange = blockChange as BlockRecalculationResult | null;
 
     if (returnBlockChange && returnBlockChange.changed) {
@@ -655,6 +615,56 @@ export class LoanService {
     this.writeAudit(actor, 'RETURN_BOOK', 'LoanRecord', currentLoanId, this.toLoanAuditSnapshot(currentLoan), result);
 
     return result;
+  }
+
+  private async createOverdueFineRecordsForReturnedLoan(
+    loan: Pick<LoanRecordDocument, '_id' | 'memberId' | 'dueDate'>,
+    returnedAt: Date,
+  ): Promise<BlockRecalculationResult | null> {
+    const overdueDates = buildOverdueDates(loan.dueDate, returnedAt);
+
+    if (overdueDates.length === 0) {
+      return null;
+    }
+
+    const latestOverdueDate = overdueDates.at(-1);
+
+    if (!latestOverdueDate) {
+      throw new BusinessRuleError(ERR.COMMON_BAD_REQUEST, 422, 'Overdue fine calculation failed');
+    }
+
+    const fineRates = await this.repository.findFineRatesEffectiveOnOrBefore(latestOverdueDate);
+    const fineRecords: Array<{
+      loanId: Types.ObjectId;
+      memberId: Types.ObjectId;
+      overdueDate: Date;
+      amount: number;
+      status: FineStatus;
+      note: string;
+    }> = [];
+
+    for (const overdueDate of overdueDates) {
+      const fineRate = getApplicableFineRate(fineRates, overdueDate);
+
+      fineRecords.push({
+        loanId: loan._id,
+        memberId: loan.memberId,
+        overdueDate,
+        amount: fineRate.ratePerDay,
+        status: FineStatus.Unpaid,
+        note: 'Quá hạn',
+      });
+    }
+
+    try {
+      await this.repository.createFineRecords(fineRecords);
+    } catch (error) {
+      if (!isDuplicateKeyError(error)) {
+        throw error;
+      }
+    }
+
+    return recalculateMemberBlock(loan.memberId.toString(), this.repository);
   }
 
   private async buildLoanListItems(loans: LoanRecordDocument[]): Promise<LoanListItem[]> {

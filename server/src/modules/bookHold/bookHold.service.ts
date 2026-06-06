@@ -50,6 +50,7 @@ function createBookRef(book: BookDocument, authors: BookNameRef[], categories: B
     isbn: book.isbn,
     title: book.title,
     bookValue: book.bookValue,
+    coverImage: book.coverImage,
     authors,
     categories,
   };

@@ -400,11 +400,8 @@ export class LoanRepository {
     return query.exec();
   }
 
-  async createFineRecords(input: Array<Omit<FineRecord, 'createdAt'>>, session: ClientSession): Promise<FineRecordDocument[]> {
-    return FineRecordModel.insertMany(input, {
-      session,
-      ordered: false,
-    });
+  async createFineRecords(input: Array<Omit<FineRecord, 'createdAt'>>, session?: ClientSession): Promise<FineRecordDocument[]> {
+    return FineRecordModel.insertMany(input, session ? { session, ordered: false } : { ordered: false });
   }
 
   async sumUnpaidFines(memberId: string | Types.ObjectId, session?: ClientSession): Promise<number> {

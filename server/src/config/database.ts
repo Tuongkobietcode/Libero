@@ -4,6 +4,7 @@ import { logger } from '../common/middleware/requestLogger';
 import { env } from './env';
 
 const RETRY_DELAY_MS = 5_000;
+const SERVER_SELECTION_TIMEOUT_MS = 15_000;
 
 const connectionStateMap: Record<number, 'disconnected' | 'connected' | 'connecting' | 'disconnecting'> = {
   0: 'disconnected',
@@ -16,6 +17,10 @@ let connectPromise: Promise<typeof mongoose> | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
 let listenersBound = false;
 let shuttingDown = false;
+
+function shouldPreferIpv4ForLocalMongo(uri: string): boolean {
+  return uri.includes('localhost') || uri.includes('127.0.0.1') || uri.includes('[::1]');
+}
 
 function clearReconnectTimer(): void {
   if (reconnectTimer) {
@@ -72,11 +77,17 @@ export async function connectToDatabase(): Promise<void> {
     return;
   }
 
+  const connectionOptions: mongoose.ConnectOptions = {
+    autoIndex: env.NODE_ENV !== 'production',
+    serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS,
+  };
+
+  if (shouldPreferIpv4ForLocalMongo(env.MONGODB_URI)) {
+    connectionOptions.family = 4;
+  }
+
   connectPromise = mongoose
-    .connect(env.MONGODB_URI, {
-      autoIndex: env.NODE_ENV !== 'production',
-      serverSelectionTimeoutMS: RETRY_DELAY_MS,
-    })
+    .connect(env.MONGODB_URI, connectionOptions)
     .catch((error: unknown) => {
       scheduleReconnect();
       throw error;

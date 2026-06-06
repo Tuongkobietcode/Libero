@@ -39,6 +39,7 @@ export interface LoanBookRef {
   isbn: string;
   title: string;
   bookValue?: number;
+  coverImage?: string;
   authors: BookNameRef[];
 }
 

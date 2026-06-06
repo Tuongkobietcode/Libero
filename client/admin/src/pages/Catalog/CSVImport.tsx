@@ -34,7 +34,7 @@ export default function CSVImportPage() {
     <AdminStack>
       <AdminPanel
         title="Tệp dữ liệu"
-        description="Tải hàng loạt sách bằng CSV. Các cột cần có: isbn, title, author, category, quantity, shelfLocation."
+        description="Tải hàng loạt sách bằng CSV. Các cột cần có: isbn, title, author, category, quantity, shelfLocation. Có thể thêm coverImage; nếu bỏ trống hệ thống sẽ dùng ảnh bìa mặc định."
       >
         <Upload.Dragger
           accept=".csv"

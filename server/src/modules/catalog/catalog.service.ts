@@ -37,6 +37,8 @@ import type {
   UpdateCopyStatusDto,
 } from './catalog.types';
 
+const DEFAULT_BOOK_COVER_IMAGE = 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=400&auto=format&fit=crop';
+
 type NameDocument = AuthorDocument | CategoryDocument;
 
 interface CopyCountSummary {
@@ -597,6 +599,7 @@ export class CatalogService {
               publisher: row.publisher,
               publishYear: row.publishYear,
               description: row.description,
+              coverImage: row.coverImage ?? DEFAULT_BOOK_COVER_IMAGE,
               quantity: row.quantity,
               shelfLocation: row.shelfLocation,
             },

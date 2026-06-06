@@ -10,8 +10,8 @@ import {
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 
-import { AdminSelect } from '../../components/AdminSurface';
 import { BookCoverArt } from '../../components/BookCoverArt';
 import { catalogApi } from '../../services/catalog.api';
 import { fineApi } from '../../services/fine.api';
@@ -45,6 +45,48 @@ function formatNumber(value?: number): string {
 
 function formatCompactCurrency(value?: number): string {
   return formatCurrency(value ?? 0).replace(/\s/g, ' ');
+}
+
+function toDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function getLastSevenDayRange() {
+  const today = new Date();
+  const to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+  const from = new Date(to);
+  from.setDate(to.getDate() - 6);
+  from.setHours(0, 0, 0, 0);
+
+  return {
+    from,
+    to,
+    fromParam: from.toISOString(),
+    toParam: to.toISOString(),
+  };
+}
+
+function fillDailyLoanStats(data: LoanStatsItem[], from: Date): LoanStatsItem[] {
+  const byPeriod = new Map(data.map((item) => [item.period, item]));
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(from);
+    date.setDate(from.getDate() + index);
+    const period = toDateKey(date);
+
+    return byPeriod.get(period) ?? {
+      period,
+      totalLoans: 0,
+      activeLoans: 0,
+      overdueLoans: 0,
+      returnedLoans: 0,
+      lostLoans: 0,
+    };
+  });
 }
 
 function getToneClasses(tone: StatConfig['tone']) {
@@ -116,7 +158,7 @@ function StatCard({ stat }: { stat: StatConfig }) {
 }
 
 function normalizeChartData(data: LoanStatsItem[]) {
-  const values = data.slice(-7);
+  const values = data;
 
   const rawMax = Math.max(1, ...values.flatMap((item) => [item.totalLoans, item.returnedLoans]));
   const tickStep = rawMax <= 10 ? 1 : Math.ceil(rawMax / 5);
@@ -153,7 +195,9 @@ function normalizeChartData(data: LoanStatsItem[]) {
 }
 
 function BorrowChart({ data }: { data: LoanStatsItem[] }) {
-  if (!data.length) {
+  const hasActivity = data.some((item) => item.totalLoans > 0 || item.returnedLoans > 0);
+
+  if (!hasActivity) {
     return (
       <div className="grid min-h-[260px] place-items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center">
         <div>
@@ -195,11 +239,12 @@ function BorrowChart({ data }: { data: LoanStatsItem[] }) {
   );
 }
 
-function BookCover({ title, seed }: { title: string; seed: string }) {
-  return <BookCoverArt title={title} seed={seed} size="xs" />;
+function BookCover({ title, coverImage }: { title: string; coverImage?: string }) {
+  return <BookCoverArt title={title} src={coverImage} size="xs" />;
 }
 
 export default function DashboardPage() {
+  const loanChartRange = getLastSevenDayRange();
   const booksQuery = useQuery({
     queryKey: ['dashboard', 'books-count'],
     queryFn: () => catalogApi.listBooks({ page: 1, limit: 1 }),
@@ -221,8 +266,8 @@ export default function DashboardPage() {
     queryFn: () => loanApi.listLoans({ page: 1, limit: 5 }),
   });
   const loanSummaryQuery = useQuery({
-    queryKey: ['dashboard', 'loan-summary'],
-    queryFn: () => reportApi.getLoanSummary({ groupBy: 'day' }),
+    queryKey: ['dashboard', 'loan-summary', loanChartRange.fromParam, loanChartRange.toParam],
+    queryFn: () => reportApi.getLoanSummary({ groupBy: 'day', from: loanChartRange.fromParam, to: loanChartRange.toParam }),
   });
   const popularBooksQuery = useQuery({
     queryKey: ['dashboard', 'popular-books'],
@@ -256,6 +301,9 @@ export default function DashboardPage() {
   const activeLoans = activeLoansQuery.data?.pagination.totalItems ?? 0;
   const unpaidTotal = fineSummaryQuery.data?.summary.find((item) => item.status === FineStatus.Unpaid)?.totalAmount ?? 0;
   const paidActivity = fineSummaryQuery.data?.memberDebts?.[0];
+  const loanChartData = fillDailyLoanStats(loanSummaryQuery.data ?? [], loanChartRange.from);
+  const weekLoanTotal = loanChartData.reduce((total, item) => total + item.totalLoans, 0);
+  const weekReturnTotal = loanChartData.reduce((total, item) => total + item.returnedLoans, 0);
 
   const stats: StatConfig[] = [
     {
@@ -298,6 +346,7 @@ export default function DashboardPage() {
         title: item.book.title,
         author: item.book.isbn,
         count: item.checkoutCount,
+        coverImage: item.book.coverImage,
       }))
     : [];
   const maxPopularCount = Math.max(1, ...popularBooks.map((book) => book.count));
@@ -341,29 +390,31 @@ export default function DashboardPage() {
             <div>
               <h2 className="m-0 text-lg font-extrabold">Thống kê mượn sách</h2>
             </div>
-            <AdminSelect wrapperClassName="min-w-36">
-              <option>7 ngày qua</option>
-            </AdminSelect>
+            <p className="m-0 hidden text-sm font-semibold text-slate-500 md:block">
+              {formatDate(loanChartRange.fromParam)} - {formatDate(loanChartRange.toParam)}
+            </p>
+            <span className="rounded-xl bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-600">7 ngày qua</span>
           </div>
-          <div className="mb-2 flex items-center justify-center gap-8 text-sm font-semibold">
+          <div className="mb-2 flex flex-wrap items-center justify-center gap-5 text-sm font-semibold">
             <span className="inline-flex items-center gap-2"><span className="h-1 w-7 rounded-full bg-[#5b45e8]" />Số lượt mượn</span>
             <span className="inline-flex items-center gap-2"><span className="h-1 w-7 rounded-full border-t-2 border-dashed border-[#5271ff]" />Số lượt trả</span>
           </div>
-          <BorrowChart data={loanSummaryQuery.data ?? []} />
+          <p className="m-0 mb-2 text-center text-sm font-semibold text-slate-500">
+            Mượn: {formatNumber(weekLoanTotal)} · Trả: {formatNumber(weekReturnTotal)}
+          </p>
+          <BorrowChart data={loanChartData} />
         </article>
 
         <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
           <div className="mb-5 flex items-center justify-between gap-4">
             <h2 className="m-0 text-lg font-extrabold">Sách mượn nhiều nhất</h2>
-            <AdminSelect wrapperClassName="min-w-36">
-              <option>30 ngày qua</option>
-            </AdminSelect>
+            <span className="rounded-xl bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-600">Theo báo cáo hiện tại</span>
           </div>
           {popularBooks.length ? (
             <div className="space-y-4">
               {popularBooks.map((book) => (
                 <div className="flex items-center gap-4" key={book.title}>
-                  <BookCover title={book.title} seed={book.id} />
+                  <BookCover title={book.title} coverImage={book.coverImage} />
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -394,7 +445,7 @@ export default function DashboardPage() {
         <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="m-0 text-lg font-extrabold">Hoạt động gần đây</h2>
-            <button className="rounded-xl bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-600" type="button">Xem tất cả</button>
+            <Link className="rounded-xl bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:text-[#3157ff]" to="/circulation/checkout">Xem khoản mượn</Link>
           </div>
           <div className="divide-y divide-slate-100">
             {activities.length ? (
@@ -418,7 +469,7 @@ export default function DashboardPage() {
         <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="m-0 text-lg font-extrabold">Độc giả mới</h2>
-            <button className="rounded-xl bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-600" type="button">Xem tất cả</button>
+            <Link className="rounded-xl bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:text-[#3157ff]" to="/members">Xem độc giả</Link>
           </div>
           <div className="space-y-4">
             {newReaders.length ? (

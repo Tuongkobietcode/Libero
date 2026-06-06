@@ -5,6 +5,8 @@ export interface BookVisual {
   accent: string;
 }
 
+export const DEFAULT_BOOK_COVER_IMAGE = 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=400&auto=format&fit=crop';
+
 const bookCoverPalette: BookVisual[] = [
   { bg: '#10384f', text: '#edf8ff', spine: '#072434', accent: '#f4b860' },
   { bg: '#b85c4a', text: '#fff8ed', spine: '#783326', accent: '#f5d09b' },

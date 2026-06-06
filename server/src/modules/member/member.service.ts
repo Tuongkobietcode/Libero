@@ -31,6 +31,7 @@ import type {
   RequestActor,
   SuspendMemberDto,
   UpdateManagedMemberDto,
+  UpdateMyProfileDto,
 } from './member.types';
 
 const PASSWORD_BCRYPT_COST = 12;
@@ -354,6 +355,81 @@ export class MemberService {
     const before = toMemberView(currentMember);
     const after = toMemberView(updatedMember);
     this.writeAudit(actor, 'UPDATE_MEMBER', 'Member', updatedMember.id, before, after);
+
+    return after;
+  }
+
+  async updateMyProfile(memberId: string, input: UpdateMyProfileDto, actor?: RequestActor): Promise<MemberView> {
+    const currentMember = await this.repository.findMemberById(memberId);
+
+    if (!currentMember) {
+      throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
+    }
+
+    const normalizedEmail = input.email?.toLowerCase();
+    const normalizedStudentId = input.studentId?.trim();
+
+    if (
+      normalizedEmail &&
+      normalizedEmail !== currentMember.email &&
+      (await this.repository.emailExists(normalizedEmail, currentMember.id))
+    ) {
+      throw new ConflictError(ERR.MEM_EMAIL_EXISTS, 409, 'Email already exists');
+    }
+
+    if (
+      normalizedStudentId &&
+      normalizedStudentId !== currentMember.studentId &&
+      (await this.repository.studentIdExists(normalizedStudentId, currentMember.id))
+    ) {
+      throw new ConflictError(ERR.MEM_STUDENT_ID_EXISTS, 409, 'Student ID already exists');
+    }
+
+    const optionalProfileFields = ['phone', 'studentId', 'faculty', 'className', 'campus'] as const;
+    const $set: Record<string, string> = {};
+    const $unset: Record<string, ''> = {};
+
+    if (input.fullName !== undefined) {
+      $set.fullName = input.fullName;
+    }
+
+    if (normalizedEmail !== undefined) {
+      $set.email = normalizedEmail;
+    }
+
+    for (const field of optionalProfileFields) {
+      const value = input[field];
+
+      if (value === undefined) {
+        continue;
+      }
+
+      if (value === '') {
+        $unset[field] = '';
+      } else {
+        $set[field] = value;
+      }
+    }
+
+    const update: Record<string, Record<string, string>> = {};
+
+    if (Object.keys($set).length > 0) {
+      update.$set = $set;
+    }
+
+    if (Object.keys($unset).length > 0) {
+      update.$unset = $unset;
+    }
+
+    const updatedMember = await this.repository.findMemberByIdAndUpdate(memberId, update);
+
+    if (!updatedMember) {
+      throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
+    }
+
+    const before = toMemberView(currentMember);
+    const after = toMemberView(updatedMember);
+    this.writeAudit(actor, 'UPDATE_MY_PROFILE', 'Member', updatedMember.id, before, after);
 
     return after;
   }

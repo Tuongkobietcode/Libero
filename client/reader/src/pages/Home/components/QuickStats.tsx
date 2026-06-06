@@ -3,6 +3,7 @@ import { ArrowRight, BookOpen, Bookmark, DollarSign, type LucideIcon } from 'luc
 import { useQuery } from '@tanstack/react-query';
 
 import { Card } from '../../../components/ui/Card';
+import { StaggerContainer, StaggerItem } from '../../../components/motion/ReaderMotion';
 import { cn } from '../../../utils/cn';
 import { memberApi } from '../../../services/member.api';
 import { queryKeys } from '../../../lib/queryKeys';
@@ -39,22 +40,23 @@ const TONE: Record<Tone, { icon: string; value: string; cta: string }> = {
 
 function QuickStat({ icon: Icon, title, value, description, tone, to }: QuickStatProps) {
   const t = TONE[tone];
+
   return (
-    <Card padding="sm" className="flex min-h-[156px] flex-col justify-between rounded-xl">
+    <Card padding="sm" className="flex min-h-[148px] flex-col justify-between rounded-2xl border-stone-200 bg-white/95 shadow-[0_18px_44px_-34px_rgba(28,25,23,0.38)]">
       <div className="flex items-center gap-4">
-        <div className={cn('grid h-14 w-14 shrink-0 place-items-center rounded-full md:h-16 md:w-16', t.icon)}>
+        <div className={cn('grid h-14 w-14 shrink-0 place-items-center rounded-2xl md:h-16 md:w-16', t.icon)}>
           <Icon className="h-6 w-6 md:h-7 md:w-7" aria-hidden />
         </div>
         <div className="min-w-0">
-          <h3 className="text-sm font-bold text-slate-700">{title}</h3>
-          <strong className={cn('block text-3xl font-extrabold leading-tight md:text-4xl', t.value)}>{value}</strong>
-          <p className="text-sm text-slate-500 line-clamp-1">{description}</p>
+          <h3 className="font-display text-sm font-black tracking-tight text-stone-700">{title}</h3>
+          <strong className={cn('block font-mono text-3xl font-black leading-tight tracking-tight md:text-4xl', t.value)}>{value}</strong>
+          <p className="line-clamp-1 text-sm font-medium text-stone-500">{description}</p>
         </div>
       </div>
       <Link
         to={to}
         className={cn(
-          'mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border h-9 text-sm font-semibold transition-colors',
+          'mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl border text-sm font-bold transition-colors active:scale-[0.98]',
           t.cta,
         )}
       >
@@ -98,7 +100,8 @@ export function QuickStats() {
       : 'Bạn không có khoản phạt nào';
 
   return (
-    <section className="grid gap-3 md:grid-cols-3">
+    <StaggerContainer className="grid gap-4 md:grid-cols-3">
+      <StaggerItem>
       <QuickStat
         icon={BookOpen}
         title="Đang mượn"
@@ -107,6 +110,8 @@ export function QuickStats() {
         tone="success"
         to="/my-loans"
       />
+      </StaggerItem>
+      <StaggerItem>
       <QuickStat
         icon={Bookmark}
         title="Đặt chỗ"
@@ -115,6 +120,8 @@ export function QuickStats() {
         tone="warning"
         to="/my-reservations"
       />
+      </StaggerItem>
+      <StaggerItem>
       <QuickStat
         icon={DollarSign}
         title="Tiền phạt"
@@ -123,6 +130,7 @@ export function QuickStats() {
         tone="danger"
         to="/my-fines"
       />
-    </section>
+      </StaggerItem>
+    </StaggerContainer>
   );
 }

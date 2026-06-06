@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import Toast from '../components/Toast';
 import { ReaderFooter } from '../components/layout/ReaderFooter';
 import { ReaderHeader } from '../components/layout/ReaderHeader';
+import { RouteTransition } from '../components/motion/ReaderMotion';
 import { useBootstrapAuth } from '../hooks/useAuth';
 import { useRealtime } from '../hooks/useRealtime';
 
@@ -15,7 +16,9 @@ export default function ReaderLayout() {
       <ReaderHeader />
 
       <main className="mx-auto w-full max-w-[1480px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <Outlet />
+        <RouteTransition>
+          <Outlet />
+        </RouteTransition>
       </main>
 
       <Toast />

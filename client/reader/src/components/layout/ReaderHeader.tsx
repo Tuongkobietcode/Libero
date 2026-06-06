@@ -54,8 +54,8 @@ export function ReaderHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex min-h-[76px] w-full max-w-[1480px] items-center gap-5 px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/95 shadow-[0_1px_3px_rgba(28,25,23,0.05)] backdrop-blur">
+      <div className="mx-auto flex min-h-[76px] w-full max-w-[1480px] items-center gap-8 px-4 sm:px-6 lg:px-8">
         <Brand />
         <NavMenu />
 
@@ -76,13 +76,13 @@ export function ReaderHeader() {
             <div className="flex items-center gap-2">
               <NavLink
                 to="/login"
-                className="inline-flex items-center h-10 px-3 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="inline-flex h-10 items-center px-3 text-sm font-bold text-stone-600 transition-colors hover:text-brand-600"
               >
                 Đăng nhập
               </NavLink>
               <NavLink
                 to="/register"
-                className="inline-flex items-center h-10 px-4 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700"
+                className="inline-flex h-10 items-center rounded-xl bg-brand-600 px-4 text-sm font-bold text-white transition-colors hover:bg-brand-700"
               >
                 Đăng ký
               </NavLink>

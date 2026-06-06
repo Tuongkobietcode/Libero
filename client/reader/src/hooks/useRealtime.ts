@@ -15,6 +15,11 @@ function invalidateReaderQueries(queryClient: ReturnType<typeof useQueryClient>,
 
   if (
     eventType === NotificationEvent.ReservationCreated ||
+    eventType === NotificationEvent.ReservationRequested ||
+    eventType === NotificationEvent.ReservationAdvanced ||
+    eventType === NotificationEvent.ReservationCancelled ||
+    eventType === NotificationEvent.ReservationExpired ||
+    eventType === NotificationEvent.ReservationFulfilled ||
     eventType === NotificationEvent.BookAvailable ||
     eventType === NotificationEvent.HoldExpiring
   ) {
@@ -25,7 +30,13 @@ function invalidateReaderQueries(queryClient: ReturnType<typeof useQueryClient>,
     void queryClient.invalidateQueries({ queryKey: ['reader', 'my-activities'] });
   }
 
-  if (eventType === NotificationEvent.BookHoldCreated) {
+  if (
+    eventType === NotificationEvent.BookHoldCreated ||
+    eventType === NotificationEvent.BookHoldCancelled ||
+    eventType === NotificationEvent.BookHoldExpired ||
+    eventType === NotificationEvent.BookHoldFulfilled
+  ) {
+    void queryClient.invalidateQueries({ queryKey: ['reader-my-book-holds'] });
     void queryClient.invalidateQueries({ queryKey: ['reader', 'book-detail-active-holds'] });
     void queryClient.invalidateQueries({ queryKey: ['reader', 'book-detail'] });
     void queryClient.invalidateQueries({ queryKey: ['reader', 'search-books'] });

@@ -41,7 +41,7 @@ export default function App() {
     >
       <AntdApp>
         <NotificationBridge />
-        <RouterProvider router={router} />
+        <RouterProvider router={router} future={{ v7_startTransition: true }} />
       </AntdApp>
     </ConfigProvider>
   );

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { AuthCard } from '../../components/auth/AuthCard';
-import { RegisterForm } from './sections/RegisterForm';
+import { RegisterForm } from './components/RegisterForm';
 
 export default function RegisterPage() {
   const [feedback, setFeedback] = useState<string | null>(null);

@@ -15,6 +15,11 @@ const optionalTrimmedString = z
   .transform((value) => trimToUndefined(value))
   .optional();
 
+const editableProfileString = z
+  .string()
+  .transform((value) => value.trim())
+  .optional();
+
 const passwordSchema = z
   .string()
   .min(8)
@@ -62,6 +67,18 @@ export const updateMemberSchema = z
     campus: optionalTrimmedString,
     libraryBranch: optionalTrimmedString,
     membershipTier: optionalTrimmedString,
+  })
+  .refine((value) => Object.values(value).some((field) => field !== undefined), 'At least one field must be provided');
+
+export const updateMyProfileSchema = z
+  .object({
+    fullName: z.string().trim().min(2).max(200).optional(),
+    email: z.string().email().optional(),
+    phone: editableProfileString,
+    studentId: editableProfileString,
+    faculty: editableProfileString,
+    className: editableProfileString,
+    campus: editableProfileString,
   })
   .refine((value) => Object.values(value).some((field) => field !== undefined), 'At least one field must be provided');
 

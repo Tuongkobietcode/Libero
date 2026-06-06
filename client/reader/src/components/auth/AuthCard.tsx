@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
+import { BookOpen } from 'lucide-react';
 
-import liberoIcon from '../../assets/Icon/icon.svg';
 import { cn } from '../../utils/cn';
 
 interface AuthCardProps {
@@ -16,14 +16,16 @@ export function AuthCard({ title, subtitle, children, footer, className, size = 
   return (
     <section
       className={cn(
-        'w-full',
+        'mx-auto w-full',
         size === 'md' ? 'max-w-[540px]' : 'max-w-[600px]',
         className,
       )}
     >
-      <article className="rounded-2xl border border-slate-900/10 bg-white/95 px-6 py-9 shadow-[0_22px_54px_rgba(16,24,40,0.11),0_2px_8px_rgba(16,24,40,0.05)] sm:px-10 sm:py-10 backdrop-blur-sm">
+      <article className="rounded-2xl border border-slate-900/10 bg-white/95 px-6 py-9 shadow-[0_22px_54px_rgba(16,24,40,0.11),0_2px_8px_rgba(16,24,40,0.05)] backdrop-blur-sm sm:px-10 sm:py-10">
         <div className="mb-6 flex items-center justify-center gap-3">
-          <img className="h-10 w-10 object-contain" src={liberoIcon} alt="" />
+          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-brand-600 text-white shadow-[0_14px_30px_-18px_rgba(2,132,199,0.72)]">
+            <BookOpen className="h-6 w-6" strokeWidth={2.25} aria-hidden="true" />
+          </span>
           <span className="text-3xl font-extrabold leading-none text-brand-600">LIBERO</span>
         </div>
 

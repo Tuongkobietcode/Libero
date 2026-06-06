@@ -57,6 +57,7 @@ function createFineBookRef(book: BookDocument, authors: BookNameRef[]): FineBook
     isbn: book.isbn,
     title: book.title,
     bookValue: book.bookValue,
+    coverImage: book.coverImage,
     authors,
   };
 }

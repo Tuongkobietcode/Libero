@@ -33,8 +33,9 @@ export function SearchResults({
   const items = result?.items ?? [];
 
   return (
-    <Card padding="md" className="min-w-0">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <section className="min-w-0">
+      <Card padding="md" className="mb-6 rounded-3xl">
+        <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-slate-900">Kết quả tìm kiếm</h2>
           {result ? (
@@ -71,9 +72,10 @@ export function SearchResults({
           </button>
         </div>
       </div>
+      </Card>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-16">
+        <div className="flex items-center justify-center rounded-3xl border border-slate-200 bg-white py-16">
           <Spinner size="lg" />
         </div>
       ) : isError ? (
@@ -86,7 +88,7 @@ export function SearchResults({
           <p className="mt-1 text-sm text-slate-500">Hãy thử đổi từ khóa hoặc bỏ bớt bộ lọc.</p>
         </div>
       ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
           {items.map((book) => (
             <BookCard key={book._id} book={book} />
           ))}
@@ -124,6 +126,6 @@ export function SearchResults({
           </button>
         </div>
       ) : null}
-    </Card>
+    </section>
   );
 }

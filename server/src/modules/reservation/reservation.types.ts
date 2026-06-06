@@ -31,6 +31,7 @@ export interface ReservationBookRef {
   isbn: string;
   title: string;
   bookValue?: number;
+  coverImage?: string;
   authors: BookNameRef[];
   categories: BookNameRef[];
 }

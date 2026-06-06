@@ -54,13 +54,13 @@ function buildDateMatch(field: string, from?: Date, to?: Date): Record<string, u
   };
 }
 
-function buildLoanGroupExpression(groupBy: LoanSummaryQuery['groupBy']): Record<string, unknown> {
+function buildLoanGroupExpression(field: string, groupBy: LoanSummaryQuery['groupBy']): Record<string, unknown> {
   switch (groupBy) {
     case 'week':
       return {
         $dateToString: {
           format: '%G-W%V',
-          date: '$checkoutDate',
+          date: `$${field}`,
           timezone: 'UTC',
         },
       };
@@ -68,7 +68,7 @@ function buildLoanGroupExpression(groupBy: LoanSummaryQuery['groupBy']): Record<
       return {
         $dateToString: {
           format: '%Y-%m',
-          date: '$checkoutDate',
+          date: `$${field}`,
           timezone: 'UTC',
         },
       };
@@ -77,7 +77,7 @@ function buildLoanGroupExpression(groupBy: LoanSummaryQuery['groupBy']): Record<
       return {
         $dateToString: {
           format: '%Y-%m-%d',
-          date: '$checkoutDate',
+          date: `$${field}`,
           timezone: 'UTC',
         },
       };
@@ -100,55 +100,96 @@ function buildOverdueSort(sort?: string): Record<string, 1 | -1> {
 
 export class ReportRepository {
   async aggregateLoanStats(query: LoanSummaryQuery): Promise<LoanStatsItem[]> {
-    const match = buildDateMatch('checkoutDate', query.from, query.to);
-
-    return LoanRecordModel.aggregate<LoanStatsItem>([
-      {
-        $match: match,
+    const checkoutMatch = buildDateMatch('checkoutDate', query.from, query.to);
+    const returnDateMatch = buildDateMatch('returnDate', query.from, query.to);
+    const returnMatch = {
+      ...returnDateMatch,
+      status: LoanStatus.Returned,
+      returnDate: {
+        ...((returnDateMatch.returnDate as Record<string, Date> | undefined) ?? {}),
+        $ne: null,
       },
-      {
-        $group: {
-          _id: buildLoanGroupExpression(query.groupBy),
-          totalLoans: { $sum: 1 },
-          activeLoans: {
-            $sum: {
-              $cond: [{ $eq: ['$status', LoanStatus.Active] }, 1, 0],
+    };
+
+    const [checkoutStats, returnStats] = await Promise.all([
+      LoanRecordModel.aggregate<LoanStatsItem>([
+        {
+          $match: checkoutMatch,
+        },
+        {
+          $group: {
+            _id: buildLoanGroupExpression('checkoutDate', query.groupBy),
+            totalLoans: { $sum: 1 },
+            activeLoans: {
+              $sum: {
+                $cond: [{ $eq: ['$status', LoanStatus.Active] }, 1, 0],
+              },
             },
-          },
-          overdueLoans: {
-            $sum: {
-              $cond: [{ $eq: ['$status', LoanStatus.Overdue] }, 1, 0],
+            overdueLoans: {
+              $sum: {
+                $cond: [{ $eq: ['$status', LoanStatus.Overdue] }, 1, 0],
+              },
             },
-          },
-          returnedLoans: {
-            $sum: {
-              $cond: [{ $eq: ['$status', LoanStatus.Returned] }, 1, 0],
-            },
-          },
-          lostLoans: {
-            $sum: {
-              $cond: [{ $eq: ['$status', LoanStatus.Lost] }, 1, 0],
+            returnedLoans: { $sum: 0 },
+            lostLoans: {
+              $sum: {
+                $cond: [{ $eq: ['$status', LoanStatus.Lost] }, 1, 0],
+              },
             },
           },
         },
+        {
+          $project: {
+            _id: 0,
+            period: '$_id',
+            totalLoans: 1,
+            activeLoans: 1,
+            overdueLoans: 1,
+            returnedLoans: 1,
+            lostLoans: 1,
+          },
+        },
+      ]).exec(),
+      LoanRecordModel.aggregate<Array<{ period: string; returnedLoans: number }>[number]>([
+      {
+        $match: returnMatch,
       },
       {
-        $sort: {
-          _id: 1,
+        $group: {
+          _id: buildLoanGroupExpression('returnDate', query.groupBy),
+          returnedLoans: { $sum: 1 },
         },
       },
       {
         $project: {
           _id: 0,
           period: '$_id',
-          totalLoans: 1,
-          activeLoans: 1,
-          overdueLoans: 1,
           returnedLoans: 1,
-          lostLoans: 1,
         },
       },
-    ]).exec();
+    ]).exec(),
+    ]);
+
+    const byPeriod = new Map<string, LoanStatsItem>();
+
+    for (const item of checkoutStats) {
+      byPeriod.set(item.period, item);
+    }
+
+    for (const item of returnStats) {
+      const current = byPeriod.get(item.period) ?? {
+        period: item.period,
+        totalLoans: 0,
+        activeLoans: 0,
+        overdueLoans: 0,
+        returnedLoans: 0,
+        lostLoans: 0,
+      };
+      current.returnedLoans = item.returnedLoans;
+      byPeriod.set(item.period, current);
+    }
+
+    return [...byPeriod.values()].sort((a, b) => a.period.localeCompare(b.period));
   }
 
   async aggregateOverdueList(
@@ -229,6 +270,7 @@ export class ReportRepository {
                   isbn: '$book.isbn',
                   title: '$book.title',
                   bookValue: '$book.bookValue',
+                  coverImage: '$book.coverImage',
                 },
                 checkoutDate: '$checkoutDate',
                 dueDate: '$dueDate',
@@ -295,6 +337,7 @@ export class ReportRepository {
             isbn: '$book.isbn',
             title: '$book.title',
             bookValue: '$book.bookValue',
+            coverImage: '$book.coverImage',
           },
         },
       },
@@ -362,6 +405,7 @@ export class ReportRepository {
             isbn: '$book.isbn',
             title: '$book.title',
             bookValue: '$book.bookValue',
+            coverImage: '$book.coverImage',
           },
         },
       },

@@ -63,6 +63,7 @@ function createReservationBookRef(
     isbn: book.isbn,
     title: book.title,
     bookValue: book.bookValue,
+    coverImage: book.coverImage,
     authors,
     categories,
   };

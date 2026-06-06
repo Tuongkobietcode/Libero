@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { BookOpen, X } from 'lucide-react';
 
 import { useAuth } from '../../hooks/useAuth';
 import { catalogApi } from '../../services/catalog.api';
@@ -14,18 +15,29 @@ import { extractErrorMessage } from '../../utils/format';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 
-import { BookSidebar } from './sections/BookSidebar';
-import { BookHero } from './sections/BookHero';
-import { AvailabilityCard } from './sections/AvailabilityCard';
-import { CopiesTable } from './sections/CopiesTable';
-import { RelatedBooks } from './sections/RelatedBooks';
+import { BookSidebar } from './components/BookSidebar';
+import { BookHero } from './components/BookHero';
+import { AvailabilityCard } from './components/AvailabilityCard';
+import { CopiesTable } from './components/CopiesTable';
+import { RelatedBooks } from './components/RelatedBooks';
 
 export default function BookDetailPage() {
   const { id = '' } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAuthenticated, user } = useAuth();
   const notify = useNotificationsStore((state) => state.push);
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  function closeModal() {
+    if (location.key && location.key !== 'default') {
+      navigate(-1);
+      return;
+    }
+
+    navigate('/search');
+  }
 
   const bookQuery = useQuery({
     queryKey: queryKeys.bookDetail(id),
@@ -49,7 +61,7 @@ export default function BookDetailPage() {
   const reserveMutation = useMutation({
     mutationFn: () => reservationApi.createReservation(id),
     onSuccess: () => {
-      setFeedback('Đặt chỗ thành công. Bạn có thể theo dõi vị trí hàng chờ trong mục Đặt chỗ.');
+      setFeedback('Đặt chỗ thành công. Bạn có thể theo dõi vị trí hàng chờ trong mục Đặt trước.');
       void queryClient.invalidateQueries({ queryKey: ['reader', 'book-detail-active-reservations'] });
       void queryClient.invalidateQueries({ queryKey: ['reader', 'my-reservations'] });
     },
@@ -93,6 +105,17 @@ export default function BookDetailPage() {
     setFeedback(null);
   }, [id]);
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        closeModal();
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  });
+
   if (bookQuery.isLoading) {
     return (
       <div className="flex min-h-[360px] items-center justify-center">
@@ -116,45 +139,63 @@ export default function BookDetailPage() {
   const canReaderReserve = user?.role === Role.Student || user?.role === Role.Lecturer;
   const isBlocked = Boolean(user?.isBlocked);
 
-  return (
-    <div className="flex flex-col gap-4 py-2">
-      <Link
-        to="/search"
-        className="inline-flex w-fit items-center gap-2 rounded-lg px-1 py-1 text-sm font-semibold text-slate-500 hover:text-brand-600 transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden />
-        Quay lại tìm kiếm
-      </Link>
+  return createPortal(
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/55 px-3 py-6 sm:px-5 sm:py-12" role="dialog" aria-modal="true" aria-labelledby="book-detail-title">
+      <button
+        type="button"
+        className="fixed inset-0 cursor-default"
+        aria-label="Đóng chi tiết sách"
+        onClick={closeModal}
+      />
 
-      <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <BookSidebar book={book} />
+      <div className="relative mx-auto flex h-[min(80vh,760px)] w-full max-w-[980px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_34px_90px_-34px_rgba(2,8,23,0.75)]">
+        <header className="flex shrink-0 items-center justify-between border-b-2 border-slate-950/90 bg-slate-50 px-5 py-3.5">
+          <h1 id="book-detail-title" className="m-0 inline-flex items-center gap-2.5 font-display text-xl font-black uppercase tracking-[0.08em] text-slate-500">
+            <BookOpen className="h-7 w-7 text-brand-600" aria-hidden />
+            Chi tiết tác phẩm
+          </h1>
+          <button
+            type="button"
+            onClick={closeModal}
+            className="grid h-9 w-9 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-100"
+            aria-label="Đóng chi tiết sách"
+          >
+            <X className="h-6 w-6" aria-hidden />
+          </button>
+        </header>
 
-        <main className="flex min-w-0 flex-col gap-6">
-          <Card padding="lg">
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="flex-1 overflow-y-auto">
+          <section className="grid lg:grid-cols-[290px_minmax(0,1fr)]">
+            <aside className="p-5 lg:border-r-2 lg:border-slate-950/90">
+              <BookSidebar book={book} />
+              <AvailabilityCard
+                book={book}
+                isAuthenticated={isAuthenticated}
+                canReaderReserve={canReaderReserve}
+                isBlocked={isBlocked}
+                activeReservation={activeReservation}
+                activeHold={activeHold}
+                feedback={feedback}
+                isReserving={reserveMutation.isPending}
+                isHolding={holdMutation.isPending}
+                onReserve={() => reserveMutation.mutate()}
+                onHold={() => holdMutation.mutate()}
+              />
+            </aside>
+
+            <main className="min-w-0 p-5 lg:p-6">
               <BookHero book={book} />
-              <div className="xl:border-l xl:border-slate-100 xl:pl-6">
-                <AvailabilityCard
-                  book={book}
-                  isAuthenticated={isAuthenticated}
-                  canReaderReserve={canReaderReserve}
-                  isBlocked={isBlocked}
-                  activeReservation={activeReservation}
-                  activeHold={activeHold}
-                  feedback={feedback}
-                  isReserving={reserveMutation.isPending}
-                  isHolding={holdMutation.isPending}
-                  onReserve={() => reserveMutation.mutate()}
-                  onHold={() => holdMutation.mutate()}
-                />
-              </div>
-            </div>
-          </Card>
+              <CopiesTable book={book} />
+            </main>
+          </section>
 
-          <CopiesTable book={book} />
-          <RelatedBooks currentBookId={book._id} />
-        </main>
+          <div className="border-t border-slate-200 bg-surface px-5 py-5">
+            <RelatedBooks currentBookId={book._id} />
+          </div>
+        </div>
+
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

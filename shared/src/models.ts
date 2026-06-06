@@ -203,6 +203,7 @@ export interface LoanBookRef {
   isbn: string;
   title: string;
   bookValue?: number;
+  coverImage?: string;
   authors: BookNameRef[];
 }
 
@@ -262,6 +263,7 @@ export interface ReservationBookRef {
   isbn: string;
   title: string;
   bookValue?: number;
+  coverImage?: string;
   authors: BookNameRef[];
   categories: BookNameRef[];
 }
@@ -315,6 +317,7 @@ export interface BookHoldBookRef {
   isbn: string;
   title: string;
   bookValue?: number;
+  coverImage?: string;
   authors: BookNameRef[];
   categories: BookNameRef[];
 }
@@ -379,6 +382,7 @@ export interface FineBookRef {
   isbn: string;
   title: string;
   bookValue?: number;
+  coverImage?: string;
   authors: BookNameRef[];
 }
 
@@ -419,6 +423,7 @@ export interface ReportBookRef {
   isbn: string;
   title: string;
   bookValue?: number;
+  coverImage?: string;
 }
 
 export interface ReportMemberRef {

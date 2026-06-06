@@ -2,11 +2,25 @@ import type { ApiEnvelope } from '../types/api';
 import type { MemberActivityItem, MemberStatsView, MemberView } from '../types/models';
 import { apiClient, authClient, unwrapResponse } from './api';
 
+export interface UpdateMyProfilePayload {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  studentId?: string;
+  faculty?: string;
+  className?: string;
+  campus?: string;
+}
+
 export const memberApi = {
   async getMe(accessToken?: string): Promise<MemberView> {
     const response = await (accessToken ? authClient : apiClient).get<ApiEnvelope<MemberView>>('/members/me', {
       ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
     });
+    return unwrapResponse(response.data);
+  },
+  async updateMyProfile(payload: UpdateMyProfilePayload): Promise<MemberView> {
+    const response = await apiClient.patch<ApiEnvelope<MemberView>>('/members/me', payload);
     return unwrapResponse(response.data);
   },
   async getMyStats(): Promise<MemberStatsView> {

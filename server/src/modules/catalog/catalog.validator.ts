@@ -133,4 +133,5 @@ export const csvImportRowSchema: z.ZodType<CsvImportRow> = z.object({
   publisher: optionalTrimmedStringSchema,
   publishYear: optionalNumberSchema,
   description: optionalTrimmedStringSchema,
+  coverImage: optionalTrimmedStringSchema,
 });

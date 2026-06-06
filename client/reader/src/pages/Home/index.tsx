@@ -1,23 +1,17 @@
-import { HeroSearch } from './sections/HeroSearch';
-import { QuickStats } from './sections/QuickStats';
-import { NewBooks, PopularBooks, Recommendations } from './sections/BookShelves';
-import { RecentActivity } from './sections/RecentActivity';
+import { HeroSearch } from './components/HeroSearch';
+import { QuickStats } from './components/QuickStats';
+import { NewBooks, PopularBooks, Recommendations } from './components/BookShelves';
+import { RecentActivity } from './components/RecentActivity';
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-9">
       <HeroSearch />
-
       <QuickStats />
-
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <NewBooks />
-          <PopularBooks />
-          <Recommendations />
-        </div>
-        <RecentActivity />
-      </div>
+      <RecentActivity />
+      <NewBooks />
+      <PopularBooks />
+      <Recommendations />
     </div>
   );
 }

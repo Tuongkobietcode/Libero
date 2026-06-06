@@ -47,6 +47,7 @@ export interface ReportBookRef {
   isbn: string;
   title: string;
   bookValue?: number;
+  coverImage?: string;
 }
 
 export interface ReportMemberRef {

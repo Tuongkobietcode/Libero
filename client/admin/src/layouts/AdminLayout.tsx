@@ -13,7 +13,6 @@ import {
   LockOutlined,
   LogoutOutlined,
   PieChartOutlined,
-  SearchOutlined,
   SettingOutlined,
   TeamOutlined,
   UserOutlined,
@@ -460,17 +459,6 @@ export default function AdminLayout() {
           </div>
 
           <div className="flex items-center gap-4">
-            <label className="relative hidden md:block">
-              <span className="sr-only">Tìm kiếm nhanh</span>
-              <SearchOutlined className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                className="h-10 w-[320px] rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-20 text-sm font-semibold text-slate-600 outline-none transition placeholder:text-slate-400 focus:border-[#3157ff] focus:bg-white focus:ring-4 focus:ring-blue-100"
-                placeholder="Tìm kiếm nhanh..."
-                type="search"
-              />
-              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Ctrl + K</span>
-            </label>
-
             <AdminNotificationBell />
             {user ? <AdminUserMenu user={user} onLogout={() => void logout()} /> : null}
           </div>

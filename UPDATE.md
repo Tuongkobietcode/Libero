@@ -539,3 +539,261 @@ Khi mở chat mới, nếu chuẩn bị sửa lớn nên chạy lại:
 - `npm run test --workspace server -- --runTestsByPath tests/integration/auth.test.ts`
 
 Ghi chú: `npm run build:admin` pass nhưng Vite vẫn cảnh báo chunk lớn hơn 500kB. Đây là warning bundle size, không phải lỗi compile.
+
+## 11. Cập Nhật Phiên 2026-05-30
+
+Mục này compact lại toàn bộ bối cảnh mới nhất trong phiên làm việc dài sau mốc 2026-05-14. Đây là trạng thái hiện tại của dự án trong worktree, chưa phải snapshot đã commit.
+
+### Runtime, Docker, seed và dữ liệu demo
+
+- Lỗi `Network Error` ở admin/reader có nguyên nhân chính là frontend gọi `http://localhost:5000/api/v1/auth/login` nhưng backend server chưa chạy hoặc không lắng nghe port `5000`, dẫn tới `ERR_CONNECTION_REFUSED`.
+- MongoDB và Redis đang dùng Docker, nên Docker Desktop và containers phải chạy trước. Tuy nhiên Docker chỉ là hạ tầng DB/cache; vẫn phải chạy backend bằng `npm run dev --workspace server`.
+- Cảnh báo VSCode về `https://www.schemastore.org/tsconfig` không load được schema là lỗi mạng/schema của editor, không phải nguyên nhân login hay API lỗi.
+- Nếu đã test e2e thủ công và muốn giữ dữ liệu, không chạy `npm run seed:reset-demo`. Lệnh này có tính destructive và sẽ reset dữ liệu vận hành demo như loans, reservations, book holds, fines, notifications, audit logs, refresh tokens.
+- `npm run seed` chỉ nên dùng khi cần đảm bảo base data. Không cần chạy lại mỗi ngày nếu DB vẫn còn dữ liệu và Docker volumes chưa bị xóa.
+- Khi cần demo sạch từ đầu thì dùng `npm run seed:reset-demo`, nhưng phải chấp nhận mất dữ liệu test tay trước đó.
+
+### Trạng thái logic dự án
+
+- Với phạm vi đồ án môn học, phần logic nghiệp vụ đã gần hoàn thiện để demo: đăng ký, đăng nhập, catalog, copies, đặt giữ, đặt chỗ, mượn trả, gia hạn, quá hạn, phạt, báo mất, báo cáo và dashboard admin.
+- Các lỗi backend đáng chú ý đã được rà và sửa trong quá trình làm:
+  - Backend không chạy làm frontend không đăng nhập được.
+  - API return loan từng trả `500 Internal Server Error` ở `/api/v1/loans/:id/return`.
+  - Dashboard admin cần biểu đồ thống kê mượn sách dùng data thật thay vì mock/static.
+  - Popular books backend đã sửa query dùng đúng `checkoutDate` thay vì field sai.
+- Luồng còn cần tiếp tục kiểm thử thủ công trước demo: book hold, reservation khi hết sách, checkout, return, renew, overdue, fine, lost copy và notification admin.
+
+### Admin notification
+
+- UI notification admin phải nhận thông báo từ tất cả nghiệp vụ quan trọng, không chỉ một flow riêng lẻ.
+- Các flow cần hiện notification:
+  - Có reader mới đăng ký tài khoản.
+  - Có yêu cầu đặt giữ sách mới.
+  - Có yêu cầu đặt chỗ khi sách hết.
+  - Hold/reservation được duyệt, hoàn tất, hủy hoặc hết hạn.
+  - Checkout/mượn sách mới.
+  - Return/trả sách.
+  - Báo mất sách.
+  - Loan quá hạn.
+  - Fine phát sinh, được thanh toán hoặc được miễn giảm.
+  - Thay đổi trạng thái tài khoản reader khi ảnh hưởng quyền mượn.
+- Thứ tự triển khai đã chốt: làm theo cụm trước gồm new user, book hold/reservation và core circulation notification.
+
+### Admin UI và layout
+
+- Bỏ light/dark mode khỏi admin vì không cần trong phạm vi dự án.
+- Sidebar admin không nên chứa profile/logout ở đáy nữa. Profile actions chuyển lên header giống reader.
+- Header admin cần có dropdown tài khoản gồm `Hồ sơ của tôi` và `Đăng xuất`, dùng được cho librarian/admin account.
+- Bỏ hamburger/toggle sidebar và các phần liên quan vì không dùng.
+- Logo admin cần đi theo concept logo reader, không dùng biểu tượng chữ `L` tự vẽ.
+- Dashboard admin đang được chỉnh để dùng biểu đồ/report data thật từ backend.
+
+### README và setup máy khác
+
+- README cần mô tả đầy đủ setup để người khác chạy được dự án:
+  - Cài Node.js/npm phù hợp.
+  - Cài Docker Desktop.
+  - Chạy MongoDB và Redis bằng Docker.
+  - Cài dependencies ở root.
+  - Tạo/cấu hình `.env` cho server, admin và reader.
+  - Chạy seed đúng mục đích: `npm run seed` để đảm bảo base data, `npm run seed:reset-demo` để reset demo sạch.
+  - Chạy backend, admin và reader ở các terminal riêng.
+- Có thể mở terminal khác để chạy git push trong lúc dự án đang chạy. Việc này không ảnh hưởng các dev server nếu không tắt terminal đang chạy app.
+
+### Cover image thật và dữ liệu sách
+
+- Yêu cầu mới: bỏ cách "vẽ" ảnh bìa/fallback giả bằng nền CSS làm nguồn chính. Mỗi đầu sách cần có `coverImage` là URL ảnh thật, kèm mô tả/tóm tắt phù hợp.
+- `server/src/scripts/seed.ts` đã được mở rộng với các URL Unsplash cho dữ liệu sách nền.
+- `shared/src/bookVisuals.ts` có `DEFAULT_BOOK_COVER_IMAGE` cho sách CSV hoặc sách thiếu ảnh.
+- `shared/src/models.ts` và các type/service backend đã bổ sung `coverImage` để truyền ảnh qua nhiều nghiệp vụ.
+- Các module backend đã hoặc cần đảm bảo trả `coverImage` trong book ref:
+  - Catalog.
+  - Loan.
+  - Reservation.
+  - Book hold.
+  - Fine.
+  - Report.
+- Một số ảnh tiêu biểu đã gán:
+  - `Clean Code`: `photo-1555066931-4365d14bab8c`.
+  - `Design Patterns`: `photo-1618005182384-a83a8bd57fbe`.
+  - `Sapiens`: `photo-1451187580459-43490279c0fa`.
+  - `Nhà Giả Kim`: `photo-1512820790803-83ca734da794`.
+  - `Thinking, Fast and Slow`: `photo-1506126613408-eca07ce68773`.
+  - `Dạy Con Làm Giàu`: `photo-1526304640581-d334cdbbf45e`.
+  - `Lược Sử Thời Gian`: `photo-1462331940025-496dfbfc7564`.
+  - Default CSV: `photo-1543002588-bfa74002ed7e`.
+  - `Bộ công cụ tư duy phản biện`: `photo-1454165804606-c3d57bc86b40`.
+
+### Reader UI direction
+
+- Phạm vi redesign hiện tại ưu tiên reader. Admin chỉ cần polish UI, không cần motion sâu.
+- Ràng buộc quan trọng: không đổi business logic, API flow, persistence hay kiểu dữ liệu nghiệp vụ nếu không cần cho UI.
+- Theme reader chuyển từ tím sang xanh nước biển/ocean blue cho navigation, hero và action chính.
+- Font direction:
+  - Inter cho UI text.
+  - Playfair Display hoặc Space Grotesk cho heading lớn.
+  - JetBrains Mono cho barcode, ISBN, mã copy, ngày, tiền phạt.
+- Tránh UI "AI slop": không gradient lòe loẹt, không neon, không card lồng card, không text quá lớn trong panel nhỏ, không icon tự vẽ khi có icon thư viện.
+
+### Reader header và navigation
+
+- Global Reader Layout cơ bản giữ nguyên.
+- Logo/header reader đổi sang concept icon cuốn sách/thư viện từ thư viện icon, không dùng logo chữ `L`.
+- Navigation active chỉ đổi màu chữ/icon sang xanh nước biển. Không dùng nền chữ nhật/pill lớn như trước.
+- Header tiếp tục giữ menu tài khoản theo concept reader.
+
+### Reader home
+
+- Hero/viewport section đã chuyển sang dark premium card theo mockup.
+- Search bar trong hero đã bị bỏ theo yêu cầu.
+- Feature footer trong hero gồm các lợi ích như đặt giữ trực tuyến, hàng chờ tự động, kỷ luật minh bạch. Phần đáy đã được yêu cầu kéo sát content hơn nhiều lần, tức giảm khoảng trống dưới feature row.
+- Quick Stats giữ lại nhưng chỉnh font. Reader summary bị bỏ vì thông tin đã có ở `Hồ sơ của tôi`.
+- Các section sách đổi theo mockup:
+  - `Gợi ý xuất sắc cho bạn`.
+  - `Hoạt động của tôi`, dùng màu tím cũ và hover border tím.
+  - `Tác phẩm được mượn nhiều`, dùng xanh lá và hover border xanh lá.
+  - `Có thể bạn sẽ thích`, dùng đỏ và hover border đỏ.
+- Book card trang chủ:
+  - Dùng ảnh thật.
+  - Bỏ ISBN trên card.
+  - Tăng chiều cao ảnh.
+  - Đẩy text xuống dưới ảnh.
+  - Áp dụng style chung cho các card.
+- Đã sửa lỗi wrapper icon bị lệch/hỏng ở khu vực hero feature và hoạt động.
+
+### Reader book detail
+
+- Trang chi tiết sách được chuyển sang modal overlay thay vì page gần full viewport.
+- Modal phải bám mockup:
+  - Header `CHI TIẾT TÁC PHẨM`, icon sách và nút đóng.
+  - Cột trái: ảnh bìa, category pill, tổng số cuốn, sẵn có, action button.
+  - Cột phải: tiêu đề, tác giả, năm xuất bản, ISBN, mã sách, ngôn ngữ, tóm tắt, bảng copy vật lý.
+  - Dưới cùng vẫn giữ `Sách liên quan`, dùng card giống trang chủ.
+- Modal đã được thu nhỏ nhiều lần theo yêu cầu, không chiếm gần full viewport.
+- Bỏ footer trong modal: `Libero Smart Library Protocol v2.5` và dòng hướng dẫn `Bấm ESC hoặc nhấp bên ngoài để đóng`.
+- Button `Đặt giữ sách (Book Hold)` đổi thành `Đặt giữ sách`.
+- Khi hết sách:
+  - Button reservation đổi sang màu cam.
+  - Text button giữ theo nghiệp vụ hiện tại, ví dụ `Đặt chỗ sách` hoặc `Đặt chỗ hàng đợi (Reservation)` tùy trạng thái đang dùng trong UI.
+  - `Sẵn có 0 bản` đổi sang màu đỏ, không để xanh lá.
+- Bảng copy vật lý đổi trạng thái sang tiếng Việt:
+  - `Available` -> `Có sẵn`.
+  - `Borrowed` -> `Đang mượn`.
+  - `Reserved` -> `Đang giữ chỗ`.
+  - `Maintenance` -> `Bảo trì`.
+  - `Lost` -> `Thất lạc`.
+
+### Reader search
+
+- Search page redesign theo mockup nhưng vẫn giữ 2 kiểu xem: lưới và danh sách.
+- Grid view dùng card giống trang chủ.
+- List view dùng layout theo mockup nhưng bỏ CTA `Yêu cầu ấn bản ngay`.
+- Filter sidebar bị bỏ. Bộ lọc chuyển lên cạnh search bar ở dạng button, khi bấm mới xổ option.
+- Filter popover gồm tình trạng và chủ đề/category, sử dụng data thật từ catalog/search state.
+
+### Reader my loans
+
+- Trang `Khoản mượn` được redesign theo hướng kết hợp mockup với logic thật.
+- Header giữ text:
+  - `Khoản mượn của tôi`.
+  - `Quản lý các cuốn sách bạn đang mượn và lịch sử mượn.`
+- Bên phải header có entry `Hướng dẫn mượn và gia hạn`.
+- Khi bấm hướng dẫn sẽ mở modal chứa chính sách mượn và gia hạn của dự án, lấy số ngày mượn, số lần gia hạn, số ngày gia hạn từ data thật nếu loan có policy snapshot.
+- Summary cards giữ concept 3 thẻ:
+  - Tổng số đang mượn.
+  - Sắp đến hạn.
+  - Quá hạn.
+- Active loan cards:
+  - Dùng API thật `/loans/me`.
+  - Không dùng layout 2 cột. Giữ 1 cột để dễ đọc.
+  - Card redesign theo mockup: ảnh bên trái lớn hơn, content bên phải gọn hơn, status/action rõ hơn.
+  - Hỗ trợ nhiều status thực tế, không hardcode một trạng thái.
+  - Renew vẫn dùng mutation thật `loanApi.renewLoan`.
+- Lịch sử đổi title thành `Lịch sử mượn` và dùng table style theo mockup.
+- Bug ảnh ở MyLoans:
+  - Book detail/trang chủ hiển thị đúng ảnh `Bộ công cụ tư duy phản biện`, nhưng MyLoans từng hiển thị fallback khác.
+  - Nguyên nhân: response `/loans/me` của server đang chạy có thể thiếu `book.coverImage`, dù source backend đã bổ sung trường này.
+  - Fix frontend: nếu `loan.book.coverImage` thiếu, MyLoans gọi thêm catalog API theo `bookId` để lấy canonical `coverImage`, tránh lệch ảnh giữa trang chủ, chi tiết và khoản mượn.
+  - Cần restart backend để server đang chạy nhận code mới và trả `coverImage` trực tiếp trong `/loans/me`.
+
+### Reader auth/toast
+
+- Auth UI reader đã được polish theo hướng splash/profile cards tốt hơn.
+- Toast reader được chỉnh lại theo hướng motion/polish, phù hợp yêu cầu hiệu ứng mượt hơn.
+
+### Files thay đổi chính trong worktree hiện tại
+
+- Admin:
+  - `client/admin/src/App.tsx`
+  - `client/admin/src/components/BookCoverArt.tsx`
+  - `client/admin/src/pages/Auth/Login.tsx`
+  - `client/admin/src/pages/Catalog/CSVImport.tsx`
+  - `client/admin/src/pages/Dashboard/index.tsx`
+- Reader layout/components:
+  - `client/reader/src/components/Toast.tsx`
+  - `client/reader/src/components/auth/AuthCard.tsx`
+  - `client/reader/src/components/book/BookCard.tsx`
+  - `client/reader/src/components/book/BookCover.tsx`
+  - `client/reader/src/components/layout/Brand.tsx`
+  - `client/reader/src/components/layout/NavMenu.tsx`
+  - `client/reader/src/components/layout/ReaderHeader.tsx`
+  - `client/reader/src/layouts/AuthBackground.tsx`
+  - `client/reader/src/layouts/AuthLayout.tsx`
+  - `client/reader/src/styles.css`
+- Reader pages:
+  - `client/reader/src/pages/Home/index.tsx`
+  - `client/reader/src/pages/Home/sections/BookShelves.tsx`
+  - `client/reader/src/pages/Home/sections/HeroSearch.tsx`
+  - `client/reader/src/pages/Home/sections/QuickStats.tsx`
+  - `client/reader/src/pages/Home/sections/RecentActivity.tsx`
+  - `client/reader/src/pages/BookDetail/index.tsx`
+  - `client/reader/src/pages/BookDetail/sections/AvailabilityCard.tsx`
+  - `client/reader/src/pages/BookDetail/sections/BookHero.tsx`
+  - `client/reader/src/pages/BookDetail/sections/BookSidebar.tsx`
+  - `client/reader/src/pages/BookDetail/sections/CopiesTable.tsx`
+  - `client/reader/src/pages/BookDetail/sections/RelatedBooks.tsx`
+  - `client/reader/src/pages/Search/index.tsx`
+  - `client/reader/src/pages/Search/sections/SearchFilters.tsx`
+  - `client/reader/src/pages/Search/sections/SearchResults.tsx`
+  - `client/reader/src/pages/MyLoans/index.tsx`
+  - `client/reader/src/pages/MyReservations/index.tsx`
+- Backend/shared:
+  - `server/src/scripts/seed.ts`
+  - `server/src/modules/catalog/catalog.service.ts`
+  - `server/src/modules/catalog/catalog.types.ts`
+  - `server/src/modules/catalog/catalog.validator.ts`
+  - `server/src/modules/loan/loan.repository.ts`
+  - `server/src/modules/loan/loan.service.ts`
+  - `server/src/modules/loan/loan.types.ts`
+  - `server/src/modules/reservation/reservation.service.ts`
+  - `server/src/modules/reservation/reservation.types.ts`
+  - `server/src/modules/bookHold/bookHold.service.ts`
+  - `server/src/modules/bookHold/bookHold.types.ts`
+  - `server/src/modules/fine/fine.service.ts`
+  - `server/src/modules/fine/fine.types.ts`
+  - `server/src/modules/report/report.repository.ts`
+  - `server/src/modules/report/report.types.ts`
+  - `shared/src/bookVisuals.ts`
+  - `shared/src/models.ts`
+- Tests:
+  - `client/reader/src/__tests__/MyLoans.test.tsx`
+  - `server/tests/integration/report.test.ts`
+  - `server/tests/unit/loan.service.test.ts`
+
+### Verification đã chạy gần nhất
+
+- `npm run typecheck:reader`
+- `npm run test:run --workspace @libero/reader -- BookDetail`
+- `npm run test:run --workspace @libero/reader -- MyLoans`
+- `npm run build:reader`
+
+Ghi chú: `npm run build:reader` pass nhưng Vite vẫn cảnh báo chunk lớn hơn 500kB. Đây là warning bundle size, không phải lỗi compile.
+
+### Việc còn lại nên làm tiếp
+
+- Restart backend dev server để các thay đổi `coverImage` trong loan/reservation/bookHold/fine/report response có hiệu lực.
+- Kiểm tra lại MyReservations vì file này vẫn đang có thay đổi liên quan cover image và có thể cần cùng cơ chế fallback catalog như MyLoans.
+- Tiếp tục redesign các trang reader còn lại theo thứ tự: `Đặt chỗ`, `Tiền phạt`, `Hồ sơ`.
+- Hoàn thiện notification admin theo cụm đã chốt.
+- Kiểm thử e2e thủ công một vòng đầy đủ bằng dữ liệu đang có, không chạy `seed:reset-demo` nếu muốn giữ dữ liệu test tay.
+- Trước khi commit, cần review lại toàn bộ dirty worktree vì hiện có khoảng 51 file thay đổi.
