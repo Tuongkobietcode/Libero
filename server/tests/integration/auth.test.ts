@@ -429,7 +429,7 @@ describe('Auth integration', () => {
     expect(response.body.error.code).toBe(ERR.AUTH_FORBIDDEN);
   });
 
-  it('allows suspended members to login for limited self-service access', async () => {
+  it('rejects suspended members at login', async () => {
     await createActiveMember({
       email: 'suspended@example.com',
       memberCardNo: 'MEM-2026-00011',
@@ -439,10 +439,9 @@ describe('Auth integration', () => {
     const response = await request(app)
       .post('/api/v1/auth/login')
       .send({ email: 'suspended@example.com', password: 'Password1' })
-      .expect(200);
+      .expect(401);
 
-    expect(response.body.success).toBe(true);
-    expect(response.body.data.accessToken).toBeTruthy();
+    expect(response.body.error.code).toBe(ERR.AUTH_ACCOUNT_SUSPENDED);
   });
 
   it('registers an active student member', async () => {
@@ -453,6 +452,8 @@ describe('Auth integration', () => {
         email: 'new-reader@example.com',
         phone: '0901234567',
         studentId: 'S1001',
+        faculty: 'Khoa Công nghệ Thông tin',
+        className: 'CNTT-K65',
         password: 'Password1',
       })
       .expect(201);
@@ -463,6 +464,11 @@ describe('Auth integration', () => {
     const member = await MemberModel.findOne({ email: 'new-reader@example.com' }).exec();
     expect(member?.status).toBe(MemberStatus.Active);
     expect(member?.phone).toBe('0901234567');
+    expect(member?.faculty).toBe('Khoa Công nghệ Thông tin');
+    expect(member?.className).toBe('CNTT-K65');
+    expect(member?.joinDate).toBeInstanceOf(Date);
+    expect(member?.expiryDate).toBeInstanceOf(Date);
+    expect(member?.expiryDate?.getTime()).toBe((member?.joinDate?.getTime() ?? 0) + 365 * 24 * 60 * 60 * 1000);
   });
 
   it('rate limits register requests after five attempts from the same IP', async () => {

@@ -11,6 +11,12 @@ jest.mock('../../src/common/utils/memberCache', () => ({
   invalidateMemberCache: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../src/modules/notification/notification.service', () => ({
+  notificationService: {
+    enqueueMemberRegisteredForBackoffice: jest.fn().mockResolvedValue([]),
+  },
+}));
+
 const mockInvalidateMemberCache = jest.mocked(invalidateMemberCache);
 
 function createRepositoryMock(): jest.Mocked<AuthRepository> {
@@ -19,6 +25,7 @@ function createRepositoryMock(): jest.Mocked<AuthRepository> {
     findMemberById: jest.fn(),
     emailExists: jest.fn(),
     studentIdExists: jest.fn(),
+    phoneExists: jest.fn(),
     createMember: jest.fn(),
     getNextMemberCardNo: jest.fn(),
     updateMemberById: jest.fn(),
@@ -68,6 +75,10 @@ describe('AuthService', () => {
     process.env.HOLD_EXPIRY_HOURS = '48';
     process.env.FRONTEND_URL = 'http://localhost:5173';
     jest.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('logs in successfully with valid credentials', async () => {
@@ -199,9 +210,13 @@ describe('AuthService', () => {
   it('registers an active student member', async () => {
     const repository = createRepositoryMock();
     const redis = createRedisMock();
+    const now = new Date('2026-06-07T10:00:00.000Z');
+
+    jest.useFakeTimers().setSystemTime(now);
 
     repository.emailExists.mockResolvedValue(false);
     repository.studentIdExists.mockResolvedValue(false);
+    repository.phoneExists.mockResolvedValue(false);
     repository.getNextMemberCardNo.mockResolvedValue('MEM-2026-00002');
     repository.createMember.mockResolvedValue({
       id: '507f1f77bcf86cd799439011',
@@ -214,6 +229,8 @@ describe('AuthService', () => {
       email: 'reader@example.com',
       phone: '0901234567',
       studentId: 'S001',
+      faculty: 'Khoa Công nghệ Thông tin',
+      className: 'CNTT-K65',
       password: 'Password1',
     });
 
@@ -226,6 +243,11 @@ describe('AuthService', () => {
         role: Role.Student,
         status: MemberStatus.Active,
         phone: '0901234567',
+        studentId: 'S001',
+        faculty: 'Khoa Công nghệ Thông tin',
+        className: 'CNTT-K65',
+        joinDate: now,
+        expiryDate: new Date('2027-06-07T10:00:00.000Z'),
       }),
     );
   });
@@ -241,11 +263,39 @@ describe('AuthService', () => {
     await expect(authService.register({
       fullName: 'Reader User',
       email: 'reader@example.com',
+      phone: '0901234567',
+      studentId: 'S001',
+      faculty: 'Khoa Công nghệ Thông tin',
+      className: 'CNTT-K65',
       password: 'Password1',
     })).rejects.toBeInstanceOf(ConflictError);
   });
 
-  it('allows suspended members to login for read-only access flows', async () => {
+  it('rejects register when phone already exists', async () => {
+    const repository = createRepositoryMock();
+    const redis = createRedisMock();
+
+    repository.emailExists.mockResolvedValue(false);
+    repository.studentIdExists.mockResolvedValue(false);
+    repository.phoneExists.mockResolvedValue(true);
+
+    const authService = new AuthService(repository, redis);
+
+    await expect(authService.register({
+      fullName: 'Reader User',
+      email: 'reader@example.com',
+      phone: '0901234567',
+      studentId: 'S001',
+      faculty: 'Khoa Công nghệ Thông tin',
+      className: 'CNTT-K65',
+      password: 'Password1',
+    })).rejects.toMatchObject<Partial<ConflictError>>({
+      code: ERR.MEM_PHONE_EXISTS,
+      statusCode: 409,
+    });
+  });
+
+  it('rejects suspended members at login', async () => {
     const repository = createRepositoryMock();
     const redis = createRedisMock();
     const member = createMemberDocument({
@@ -258,11 +308,14 @@ describe('AuthService', () => {
     repository.updateMemberById.mockResolvedValue();
 
     const authService = new AuthService(repository, redis);
-    const result = await authService.login({ email: 'reader@example.com', password: 'Password1' });
 
-    expect(result.accessToken).toBeTruthy();
-    expect(result.refreshToken).toBeTruthy();
-    expect(result.user._id).toBe(member.id);
+    await expect(authService.login({ email: 'reader@example.com', password: 'Password1' })).rejects.toMatchObject<
+      Partial<AuthenticationError>
+    >({
+      code: ERR.AUTH_ACCOUNT_SUSPENDED,
+      statusCode: 401,
+    });
+    expect(repository.createRefreshToken).not.toHaveBeenCalled();
   });
 
   it('activates legacy pending members when they login successfully', async () => {

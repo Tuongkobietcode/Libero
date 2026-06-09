@@ -52,6 +52,19 @@ export class MemberRepository implements AuthRepository {
     return existingMember !== null;
   }
 
+  async phoneExists(phone: string, excludeMemberId?: string): Promise<boolean> {
+    const filter: FilterQuery<MemberAuthDocument> = {
+      phone: phone.trim(),
+    };
+
+    if (excludeMemberId) {
+      filter._id = { $ne: excludeMemberId };
+    }
+
+    const existingMember = await MemberModel.exists(filter);
+    return existingMember !== null;
+  }
+
   async createMember(input: CreateMemberInput, session?: ClientSession): Promise<MemberAuthDocument> {
     const member = new MemberModel(input);
     await member.save({ session });

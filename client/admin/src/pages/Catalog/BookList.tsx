@@ -5,7 +5,6 @@ import {
   EditOutlined,
   ExclamationCircleOutlined,
   EyeOutlined,
-  FilterOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
@@ -270,7 +269,7 @@ export default function BookListPage() {
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
-        <div className="grid gap-4 xl:grid-cols-[minmax(260px,1.2fr)_220px_220px_auto_auto] xl:items-end">
+        <div className="grid gap-4 xl:grid-cols-[minmax(260px,1.2fr)_220px_220px_auto] xl:items-end">
           <label className="block">
             <span className="sr-only">Tìm theo tên sách, tác giả hoặc ISBN</span>
             <span className="relative block">
@@ -315,14 +314,6 @@ export default function BookListPage() {
               <option value="unavailable">Hết bản sẵn</option>
             </AdminSelect>
           </label>
-
-          <button
-            type="button"
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600"
-          >
-            <FilterOutlined />
-            Bộ lọc khác
-          </button>
 
           <button
             type="button"

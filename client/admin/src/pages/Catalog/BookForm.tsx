@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, DatePicker, Form, Input, InputNumber, Select } from 'antd';
+import { Alert, DatePicker, Form, Input, InputNumber, Select, Upload } from 'antd';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -31,6 +31,7 @@ export default function BookFormPage() {
   const notify = useNotificationsStore((state) => state.push);
   const isEdit = Boolean(id);
   const [form] = Form.useForm<BookFormValues>();
+  const coverImage = Form.useWatch('coverImage', form);
 
   const bookQuery = useQuery({
     queryKey: ['catalog', 'book', id],
@@ -63,6 +64,18 @@ export default function BookFormPage() {
       void queryClient.invalidateQueries({ queryKey: ['catalog', 'books'] });
       void queryClient.invalidateQueries({ queryKey: ['catalog', 'book', book._id] });
       navigate(`/catalog/${book._id}`);
+    },
+  });
+
+  const uploadCoverMutation = useMutation({
+    mutationFn: (file: File) => catalogApi.uploadCoverImage(file),
+    onSuccess: (result) => {
+      form.setFieldValue('coverImage', result.coverImage);
+      notify({
+        level: 'success',
+        message: 'Đã tải ảnh bìa',
+        description: 'Ảnh bìa sẽ được lưu cùng thông tin sách.',
+      });
     },
   });
 
@@ -121,7 +134,34 @@ export default function BookFormPage() {
             <Form.Item label="Năm xuất bản" name="publishYear">
               <InputNumber min={0} max={3000} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item label="URL ảnh bìa" name="coverImage">
+            <Form.Item label="Ảnh bìa sách" className="md:col-span-2">
+              <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center">
+                {coverImage ? (
+                  <img src={coverImage} alt="Ảnh bìa sách" className="h-28 w-20 rounded-lg object-cover shadow-sm" />
+                ) : (
+                  <div className="grid h-28 w-20 place-items-center rounded-lg border border-dashed border-slate-300 bg-white text-center text-xs font-semibold text-slate-400">
+                    Chưa có ảnh
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <Upload
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    maxCount={1}
+                    showUploadList={false}
+                    beforeUpload={(file) => {
+                      uploadCoverMutation.mutate(file as File);
+                      return false;
+                    }}
+                  >
+                    <button className={secondaryButtonClass} type="button" disabled={uploadCoverMutation.isPending}>
+                      {uploadCoverMutation.isPending ? 'Đang tải ảnh...' : 'Chọn ảnh từ máy'}
+                    </button>
+                  </Upload>
+                  <p className="m-0 mt-2 text-sm font-semibold text-slate-500">Hỗ trợ PNG, JPG, WEBP hoặc GIF, tối đa 5MB.</p>
+                </div>
+              </div>
+            </Form.Item>
+            <Form.Item name="coverImage" hidden>
               <Input />
             </Form.Item>
             <Form.Item className="md:col-span-2" label="Mô tả" name="description">

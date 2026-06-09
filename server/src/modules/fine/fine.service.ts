@@ -340,8 +340,8 @@ export class FineService {
       blockChange.isBlocked ? 'BLOCK_MEMBER' : 'UNBLOCK_MEMBER',
       'Member',
       memberId,
-      { isBlocked: blockChange.wasBlocked, reason: 'fine threshold' },
-      { isBlocked: blockChange.isBlocked, reason: 'fine threshold' },
+      { isBlocked: blockChange.wasBlocked, reason: 'member block policy' },
+      { isBlocked: blockChange.isBlocked, reason: blockChange.reasons.join(', ') || 'member block policy' },
     );
     await this.enqueueMemberBlockStatusNotification(memberId, blockChange);
   }
@@ -363,7 +363,7 @@ export class FineService {
         await notificationService.enqueueAccountBlocked(
           memberId,
           memberId,
-          'Outstanding unpaid fines exceeded the allowed threshold.',
+          'Member card was blocked because a borrowing policy threshold was exceeded.',
           blockChange.totalUnpaid,
         );
         return;

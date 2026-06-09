@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+
 import type { Request, Response } from 'express';
 
 import { BadRequestError } from '../../common/errors/AppError';
@@ -22,6 +26,22 @@ function buildActor(req: Request) {
     ipAddress: req.ip,
     userAgent: req.header('user-agent') ?? undefined,
   };
+}
+
+function getImageExtension(mimetype: string): string {
+  if (mimetype === 'image/png') {
+    return 'png';
+  }
+
+  if (mimetype === 'image/webp') {
+    return 'webp';
+  }
+
+  if (mimetype === 'image/gif') {
+    return 'gif';
+  }
+
+  return 'jpg';
 }
 
 export class CatalogController {
@@ -170,6 +190,27 @@ export class CatalogController {
     res.status(200).json({
       success: true,
       data: result,
+    });
+  }
+
+  async uploadCoverImage(req: Request, res: Response): Promise<void> {
+    if (!req.file?.buffer) {
+      throw new BadRequestError(ERR.COMMON_BAD_REQUEST, 400, 'Cover image file is required');
+    }
+
+    const uploadDir = path.resolve(process.cwd(), 'uploads/book-covers');
+    await mkdir(uploadDir, { recursive: true });
+
+    const fileName = `${randomUUID()}.${getImageExtension(req.file.mimetype)}`;
+    const filePath = path.join(uploadDir, fileName);
+    await writeFile(filePath, req.file.buffer);
+
+    const origin = `${req.protocol}://${req.get('host')}`;
+    res.status(201).json({
+      success: true,
+      data: {
+        coverImage: `${origin}/uploads/book-covers/${fileName}`,
+      },
     });
   }
 

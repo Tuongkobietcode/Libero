@@ -32,6 +32,7 @@ export interface LoanHistoryQuery {
 
 export interface ListLoansQuery extends LoanHistoryQuery {
   memberId?: string;
+  role?: Role;
 }
 
 export interface LoanBookRef {

@@ -233,9 +233,47 @@ export class ReportRepository {
             $max: [
               1,
               {
-                $ceil: {
-                  $divide: [{ $subtract: [now, '$dueDate'] }, 1000 * 60 * 60 * 24],
-                },
+                $add: [
+                  {
+                    $dateDiff: {
+                      startDate: {
+                        $dateTrunc: {
+                          date: {
+                            $dateAdd: {
+                              startDate: '$dueDate',
+                              unit: 'day',
+                              amount: 1,
+                            },
+                          },
+                          unit: 'day',
+                          timezone: 'Asia/Ho_Chi_Minh',
+                        },
+                      },
+                      endDate: {
+                        $dateTrunc: {
+                          date: now,
+                          unit: 'day',
+                          timezone: 'Asia/Ho_Chi_Minh',
+                        },
+                      },
+                      unit: 'day',
+                      timezone: 'Asia/Ho_Chi_Minh',
+                    },
+                  },
+                  1,
+                ],
+              },
+            ],
+          },
+        },
+      },
+      {
+        $addFields: {
+          overdueDays: {
+            $max: [
+              1,
+              {
+                $toInt: '$overdueDays',
               },
             ],
           },

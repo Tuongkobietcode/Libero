@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type JSX } from 'react';
-import { CreditCard, Mail, Phone, User } from 'lucide-react';
+import { CreditCard, Library, Mail, Phone, User } from 'lucide-react';
 
 import { Button } from '../../../components/ui/Button';
 import { Checkbox } from '../../../components/forms/Checkbox';
@@ -9,7 +9,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useNotificationsStore } from '../../../store/notifications.store';
 import { extractErrorMessage } from '../../../utils/format';
 
-type FieldName = 'fullName' | 'email' | 'password' | 'confirmPassword' | 'studentId' | 'phone' | 'terms';
+type FieldName = 'fullName' | 'email' | 'password' | 'confirmPassword' | 'studentId' | 'faculty' | 'className' | 'phone' | 'terms';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phonePattern = /^(?:\+?84|0)[0-9\s.-]{8,14}$/;
@@ -27,6 +27,8 @@ export function RegisterForm({ onRegistered }: RegisterFormProps): JSX.Element {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [studentId, setStudentId] = useState('');
+  const [faculty, setFaculty] = useState('');
+  const [className, setClassName] = useState('');
   const [phone, setPhone] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [touched, setTouched] = useState<Partial<Record<FieldName, boolean>>>({});
@@ -35,6 +37,8 @@ export function RegisterForm({ onRegistered }: RegisterFormProps): JSX.Element {
   const trimmedFullName = fullName.trim();
   const trimmedEmail = email.trim();
   const trimmedStudentId = studentId.trim();
+  const trimmedFaculty = faculty.trim();
+  const trimmedClassName = className.trim();
   const trimmedPhone = phone.trim();
 
   const fullNameRuleError = trimmedFullName.length < 2 ? 'Vui lòng nhập họ và tên.' : undefined;
@@ -56,6 +60,8 @@ export function RegisterForm({ onRegistered }: RegisterFormProps): JSX.Element {
       ? 'Mật khẩu xác nhận không khớp.'
       : undefined;
   const studentIdRuleError = !trimmedStudentId ? 'Vui lòng nhập mã sinh viên.' : undefined;
+  const facultyRuleError = !trimmedFaculty ? 'Vui lòng nhập khoa.' : undefined;
+  const classNameRuleError = !trimmedClassName ? 'Vui lòng nhập lớp.' : undefined;
   const phoneRuleError = !trimmedPhone
     ? 'Vui lòng nhập số điện thoại.'
     : !phonePattern.test(trimmedPhone)
@@ -69,6 +75,8 @@ export function RegisterForm({ onRegistered }: RegisterFormProps): JSX.Element {
     password: touched.password ? passwordRuleError : undefined,
     confirmPassword: touched.confirmPassword ? confirmPasswordRuleError : undefined,
     studentId: touched.studentId ? studentIdRuleError : undefined,
+    faculty: touched.faculty ? facultyRuleError : undefined,
+    className: touched.className ? classNameRuleError : undefined,
     phone: touched.phone ? phoneRuleError : undefined,
     terms: touched.terms ? termsRuleError : undefined,
   };
@@ -79,6 +87,8 @@ export function RegisterForm({ onRegistered }: RegisterFormProps): JSX.Element {
     passwordRuleError ||
     confirmPasswordRuleError ||
     studentIdRuleError ||
+    facultyRuleError ||
+    classNameRuleError ||
     phoneRuleError ||
     termsRuleError
   );
@@ -95,6 +105,8 @@ export function RegisterForm({ onRegistered }: RegisterFormProps): JSX.Element {
       password: true,
       confirmPassword: true,
       studentId: true,
+      faculty: true,
+      className: true,
       phone: true,
       terms: true,
     });
@@ -106,6 +118,8 @@ export function RegisterForm({ onRegistered }: RegisterFormProps): JSX.Element {
         email: trimmedEmail,
         phone: trimmedPhone,
         studentId: trimmedStudentId,
+        faculty: trimmedFaculty,
+        className: trimmedClassName,
         password,
       });
       setRegistered(true);
@@ -179,6 +193,28 @@ export function RegisterForm({ onRegistered }: RegisterFormProps): JSX.Element {
         onChange={(e) => setStudentId(e.target.value)}
       />
       <FormField
+        label="Khoa"
+        name="faculty"
+        autoComplete="organization"
+        placeholder="Nhập khoa của bạn"
+        leftIcon={<Library className="h-[18px] w-[18px]" aria-hidden />}
+        value={faculty}
+        error={errors.faculty}
+        onBlur={() => markTouched('faculty')}
+        onChange={(e) => setFaculty(e.target.value)}
+      />
+      <FormField
+        label="Lớp"
+        name="className"
+        autoComplete="organization-title"
+        placeholder="Nhập lớp của bạn"
+        leftIcon={<CreditCard className="h-[18px] w-[18px]" aria-hidden />}
+        value={className}
+        error={errors.className}
+        onBlur={() => markTouched('className')}
+        onChange={(e) => setClassName(e.target.value)}
+      />
+      <FormField
         label="Số điện thoại"
         name="phone"
         type="tel"
@@ -193,6 +229,7 @@ export function RegisterForm({ onRegistered }: RegisterFormProps): JSX.Element {
       />
 
       <Checkbox
+        name="termsAccepted"
         checked={termsAccepted}
         error={errors.terms}
         onBlur={() => markTouched('terms')}

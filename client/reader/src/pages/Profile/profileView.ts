@@ -15,7 +15,6 @@ export interface ProfileFormState {
   studentId: string;
   faculty: string;
   className: string;
-  campus: string;
 }
 
 export function formatAmount(value: number): string {
@@ -55,7 +54,6 @@ export function getProfileFormState(profile: MemberView): ProfileFormState {
     studentId: profile.studentId ?? '',
     faculty: profile.faculty ?? '',
     className: profile.className ?? '',
-    campus: profile.campus ?? '',
   };
 }
 
@@ -67,7 +65,6 @@ export function buildProfilePayload(form: ProfileFormState): UpdateMyProfilePayl
     studentId: form.studentId.trim(),
     faculty: form.faculty.trim(),
     className: form.className.trim(),
-    campus: form.campus.trim(),
   };
 }
 

@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 
 import { LoanStatus, FineStatus } from '../common/types/enums';
-import { startOfUtcDay } from '../common/utils/dateHelpers';
+import { startOfVietnamCalendarDay } from '../common/utils/dateHelpers';
 import { buildOverdueDates, getApplicableFineRate } from '../common/utils/loanFine';
 import { recalculateMemberBlock } from '../common/utils/memberBlock';
 import { logger } from '../common/middleware/requestLogger';
@@ -13,6 +13,11 @@ import { notificationService, type NotificationService } from '../modules/notifi
 interface ExistingFineRecordKey {
   loanId: string;
   overdueDate: string;
+}
+
+interface ExistingFineRecordCoverage {
+  overdueDate: Date;
+  amount: number;
 }
 
 export interface FineCalculationSummary {
@@ -27,7 +32,7 @@ export interface FineCalculationSummary {
 function buildFineRecordKey(loanId: string, overdueDate: Date): ExistingFineRecordKey {
   return {
     loanId,
-    overdueDate: startOfUtcDay(overdueDate).toISOString(),
+    overdueDate: startOfVietnamCalendarDay(overdueDate).toISOString(),
   };
 }
 
@@ -42,9 +47,9 @@ export async function runFineCalculationJob(
   const repository = options.repository ?? fineRepository;
   const notifications = options.notifications ?? notificationService;
   const startedAt = Date.now();
-  const todayStart = startOfUtcDay(now);
+  const todayStart = startOfVietnamCalendarDay(now);
   const overdueLoans = await LoanRecordModel.find({
-    status: LoanStatus.Overdue,
+    status: { $in: [LoanStatus.Overdue, LoanStatus.Active] },
     returnDate: null,
     dueDate: {
       $lt: todayStart,
@@ -81,9 +86,10 @@ export async function runFineCalculationJob(
       $in: loanIds,
     },
   })
-    .select('loanId overdueDate')
+    .select('loanId overdueDate amount')
     .exec();
 
+  const existingFineRecordsByLoanId = new Map<string, ExistingFineRecordCoverage[]>();
   const existingFineKeySet = new Set(
     existingFineRecords.map((fineRecord) => {
       const key = buildFineRecordKey(
@@ -94,6 +100,17 @@ export async function runFineCalculationJob(
       return `${key.loanId}:${key.overdueDate}`;
     }),
   );
+
+  for (const fineRecord of existingFineRecords) {
+    const loanId = fineRecord.loanId.toString();
+    const loanFineRecords = existingFineRecordsByLoanId.get(loanId) ?? [];
+
+    loanFineRecords.push({
+      overdueDate: fineRecord.overdueDate,
+      amount: fineRecord.amount,
+    });
+    existingFineRecordsByLoanId.set(loanId, loanFineRecords);
+  }
 
   const pendingFineRecords: Array<{
     loanId: Types.ObjectId;
@@ -107,6 +124,28 @@ export async function runFineCalculationJob(
 
   for (const loan of overdueLoans) {
     const overdueDates = buildOverdueDates(loan.dueDate, todayStart);
+    const overdueDateKeySet = new Set(
+      overdueDates.map((overdueDate) => startOfVietnamCalendarDay(overdueDate).toISOString()),
+    );
+    const loanFineRecords = existingFineRecordsByLoanId.get(loan._id.toString()) ?? [];
+    let legacyCoverageAmount = 0;
+
+    for (const fineRecord of loanFineRecords) {
+      const normalizedOverdueDate = startOfVietnamCalendarDay(fineRecord.overdueDate);
+      const normalizedOverdueDateKey = normalizedOverdueDate.toISOString();
+      const fineRate = getApplicableFineRate(fineRates, normalizedOverdueDate);
+
+      if (!overdueDateKeySet.has(normalizedOverdueDateKey)) {
+        legacyCoverageAmount += fineRecord.amount;
+        continue;
+      }
+
+      const surplusCoverage = fineRecord.amount - fineRate.ratePerDay;
+
+      if (surplusCoverage > 0) {
+        legacyCoverageAmount += surplusCoverage;
+      }
+    }
 
     for (const overdueDate of overdueDates) {
       const key = buildFineRecordKey(loan._id.toString(), overdueDate);
@@ -117,6 +156,11 @@ export async function runFineCalculationJob(
       }
 
       const fineRate = getApplicableFineRate(fineRates, overdueDate);
+
+      if (legacyCoverageAmount >= fineRate.ratePerDay) {
+        legacyCoverageAmount -= fineRate.ratePerDay;
+        continue;
+      }
 
       pendingFineRecords.push({
         loanId: loan._id,

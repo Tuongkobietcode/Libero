@@ -89,7 +89,7 @@ function UnpaidFineCard({ fine }: { fine: FineView }) {
 
         <div className="flex flex-col gap-3 md:col-start-2 xl:col-start-auto xl:items-end xl:justify-between">
           <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-semibold leading-6 text-red-700">
-            Thanh toán được thủ thư xác nhận tại quầy hoặc backoffice.
+            Thanh toán tại quầy ở thư viện.
           </div>
           <Link
             to={`/books/${fine.bookId}`}
@@ -108,11 +108,17 @@ function UnpaidFineCard({ fine }: { fine: FineView }) {
 export function UnpaidFinesSection({
   fines,
   loading,
+  page,
   totalItems,
+  totalPages,
+  onPageChange,
 }: {
   fines: FineView[];
   loading: boolean;
+  page: number;
   totalItems: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
 }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,31,56,0.04)]">
@@ -131,13 +137,41 @@ export function UnpaidFinesSection({
           ))}
         </div>
       ) : fines.length > 0 ? (
-        <StaggerContainer className="space-y-4">
-          {fines.map((fine) => (
-            <StaggerItem key={fine.id}>
-              <UnpaidFineCard fine={fine} />
-            </StaggerItem>
-          ))}
-        </StaggerContainer>
+        <>
+          <StaggerContainer className="space-y-4">
+            {fines.map((fine) => (
+              <StaggerItem key={fine.id}>
+                <UnpaidFineCard fine={fine} />
+              </StaggerItem>
+            ))}
+          </StaggerContainer>
+
+          {totalPages > 1 ? (
+            <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="m-0 text-sm font-semibold text-slate-500">
+                Trang {page} / {totalPages}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => onPageChange(page - 1)}
+                  className="min-h-10 rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-600 transition hover:border-brand-200 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Trước
+                </button>
+                <button
+                  type="button"
+                  disabled={page >= totalPages}
+                  onClick={() => onPageChange(page + 1)}
+                  className="min-h-10 rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-600 transition hover:border-brand-200 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </>
       ) : (
         <ReaderEmptyState
           icon={CheckCircle2}

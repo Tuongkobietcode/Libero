@@ -2,6 +2,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
+import path from 'node:path';
 
 import { NotFoundError } from './common/errors/AppError';
 import { ERR } from './common/errors/errorCodes';
@@ -44,6 +45,7 @@ app.use(cookieParser());
 app.use(rateLimiter);
 app.use(requestId);
 app.use(requestLogger);
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/book-holds', bookHoldRouter);
 app.use('/api/v1/books', catalogRouter);

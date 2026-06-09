@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 
 import { memberService } from './member.service';
 import {
+  changeMyPasswordSchema,
   createMemberSchema,
   listMembersQuerySchema,
   loanPolicyRoleParamSchema,
@@ -63,6 +64,16 @@ export class MemberController {
   async updateMyProfile(req: Request, res: Response): Promise<void> {
     const input = updateMyProfileSchema.parse(req.body);
     const result = await memberService.updateMyProfile(req.user?._id ?? '', input, buildActor(req));
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  }
+
+  async changeMyPassword(req: Request, res: Response): Promise<void> {
+    const input = changeMyPasswordSchema.parse(req.body);
+    const result = await memberService.changeMyPassword(req.user?._id ?? '', input, buildActor(req));
 
     res.status(200).json({
       success: true,

@@ -6,6 +6,7 @@ export interface MemberListParams {
   q?: string;
   role?: Role;
   status?: MemberStatus;
+  cardStatus?: 'active' | 'blocked';
   memberCardNo?: string;
   page?: number;
   limit?: number;
@@ -17,6 +18,8 @@ export interface MemberFormPayload {
   password?: string;
   phone?: string;
   studentId?: string;
+  faculty?: string;
+  className?: string;
   role: Role;
   joinDate?: string;
   expiryDate?: string;

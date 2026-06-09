@@ -48,6 +48,7 @@ function createRepositoryMock(): jest.Mocked<LoanRepository> {
     findFineRatesEffectiveOnOrBefore: jest.fn(),
     createFineRecords: jest.fn(),
     sumUnpaidFines: jest.fn(),
+    findActiveOverdueLoanDueDates: jest.fn().mockResolvedValue([]),
     listLoans: jest.fn(),
     findFineRecordsByLoanIds: jest.fn(),
     findMembersByIds: jest.fn(),
@@ -182,6 +183,29 @@ describe('LoanService', () => {
       service.renewLoan(loan.id, { actorId: member.id, actorRole: Role.Student }),
     ).rejects.toMatchObject<Partial<BusinessRuleError>>({
       code: ERR.LOAN_RENEW_OVERDUE,
+      statusCode: 422,
+    });
+  });
+
+  it('rejects renew when member card is blocked', async () => {
+    const repository = createRepositoryMock();
+    const member = createMemberDocument({ isBlocked: true });
+    const book = createBookDocument();
+    const copy = createCopyDocument(book._id, { status: CopyStatus.Borrowed });
+    const loan = createLoanDocument(member._id, copy._id, book._id, {
+      dueDate: new Date('2026-04-20T00:00:00.000Z'),
+    });
+
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-13T10:00:00.000Z'));
+    repository.findLoanById.mockResolvedValue(loan);
+    repository.findMemberById.mockResolvedValue(member);
+
+    const service = new LoanService(repository);
+
+    await expect(
+      service.renewLoan(loan.id, { actorId: member.id, actorRole: Role.Student }),
+    ).rejects.toMatchObject<Partial<BusinessRuleError>>({
+      code: ERR.LOAN_MEMBER_BLOCKED,
       statusCode: 422,
     });
   });

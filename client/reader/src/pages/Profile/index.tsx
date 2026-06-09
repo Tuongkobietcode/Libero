@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../../hooks/useAuth';
-import { memberApi, type UpdateMyProfilePayload } from '../../services/member.api';
+import { memberApi, type ChangeMyPasswordPayload, type UpdateMyProfilePayload } from '../../services/member.api';
 import { useAuthStore } from '../../store/auth.store';
 import { useNotificationsStore } from '../../store/notifications.store';
 import { extractErrorMessage } from '../../utils/format';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { EditProfileModal } from './components/EditProfileModal';
 import { ProfileActivitySection, ProfileDetailsSection, ProfileHeader, ProfileOverviewSection } from './components/ProfileSections';
 import { mergeProfileWithAuth } from './profileView';
@@ -16,6 +17,7 @@ export default function ProfilePage() {
   const setAuthUser = useAuthStore((state) => state.setUser);
   const { user } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const profileQuery = useQuery({
     queryKey: ['reader-profile'],
@@ -58,6 +60,26 @@ export default function ProfilePage() {
       notify({
         level: 'error',
         message: extractErrorMessage(error, 'Không thể cập nhật hồ sơ lúc này.'),
+      });
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: (payload: ChangeMyPasswordPayload) => memberApi.changeMyPassword(payload),
+    onSuccess: (updatedProfile) => {
+      notify({
+        level: 'success',
+        message: 'Đã đổi mật khẩu',
+        description: 'Mật khẩu đăng nhập của bạn đã được cập nhật.',
+      });
+      setChangePasswordOpen(false);
+      queryClient.setQueryData(['reader-profile'], updatedProfile);
+      void queryClient.invalidateQueries({ queryKey: ['reader-profile'] });
+    },
+    onError: (error) => {
+      notify({
+        level: 'error',
+        message: extractErrorMessage(error, 'Không thể đổi mật khẩu lúc này.'),
       });
     },
   });
@@ -109,7 +131,12 @@ export default function ProfilePage() {
 
           <ProfileDetailsSection profile={profile} onEdit={() => setEditOpen(true)} />
 
-          <ProfileActivitySection profile={profile} activities={activities} loading={activitiesQuery.isLoading} />
+          <ProfileActivitySection
+            profile={profile}
+            activities={activities}
+            loading={activitiesQuery.isLoading}
+            onChangePassword={() => setChangePasswordOpen(true)}
+          />
 
           <EditProfileModal
             open={editOpen}
@@ -117,6 +144,13 @@ export default function ProfilePage() {
             saving={updateProfileMutation.isPending}
             onClose={() => setEditOpen(false)}
             onSubmit={(payload) => updateProfileMutation.mutate(payload)}
+          />
+
+          <ChangePasswordModal
+            open={changePasswordOpen}
+            saving={changePasswordMutation.isPending}
+            onClose={() => setChangePasswordOpen(false)}
+            onSubmit={(payload) => changePasswordMutation.mutate(payload)}
           />
         </>
       )}

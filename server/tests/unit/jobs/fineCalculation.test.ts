@@ -127,7 +127,7 @@ describe('fineCalculation job', () => {
     });
 
     expect(loanFind).toHaveBeenCalledWith({
-      status: LoanStatus.Overdue,
+      status: { $in: [LoanStatus.Overdue, LoanStatus.Active] },
       returnDate: null,
       dueDate: {
         $lt: new Date('2026-04-13T00:00:00.000Z'),
@@ -164,6 +164,251 @@ describe('fineCalculation job', () => {
     expect(summary.blockChanges).toBe(1);
     expect(repository.updateMemberBlockedStatus).toHaveBeenCalledWith(memberId.toString(), true, undefined);
     expect(notifications.enqueueAccountBlocked).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates fines for active loans that are already past due when the marker has not run', async () => {
+    const { LoanStatus } = await import('../../../src/common/types/enums');
+    const { overdueLoan } = createLoanFixtures();
+    const insertedFineRecords: Array<{
+      loanId: Types.ObjectId;
+      memberId: Types.ObjectId;
+      overdueDate: Date;
+      amount: number;
+      status: string;
+      note: string;
+    }> = [];
+    const loanFind = jest.fn().mockReturnValue({
+      sort: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue([
+          {
+            ...overdueLoan,
+            status: LoanStatus.Active,
+          },
+        ]),
+      }),
+    });
+    const fineFind = jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue([]),
+      }),
+    });
+    const insertMany = jest.fn().mockImplementation(async (records: typeof insertedFineRecords) => {
+      insertedFineRecords.push(...records);
+      return records;
+    });
+
+    jest.doMock('../../../src/models/LoanRecord.model', () => ({
+      LoanRecordModel: {
+        find: loanFind,
+      },
+    }));
+    jest.doMock('../../../src/models/FineRecord.model', () => ({
+      FineRecordModel: {
+        find: fineFind,
+        insertMany,
+      },
+    }));
+
+    const repository = {
+      listFineRates: jest.fn().mockResolvedValue([
+        {
+          ratePerDay: 5000,
+          effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        },
+      ]),
+      findMemberById: jest.fn().mockResolvedValue({ isBlocked: false }),
+      sumUnpaidFines: jest.fn().mockResolvedValue(0),
+      updateMemberBlockedStatus: jest.fn(),
+    };
+    const notifications = {
+      enqueueAccountBlocked: jest.fn(),
+      enqueueAccountActivated: jest.fn(),
+    };
+
+    const { runFineCalculationJob } = await import('../../../src/jobs/fineCalculation.job');
+
+    const summary = await runFineCalculationJob({
+      now: new Date('2026-04-13T08:00:00.000Z'),
+      repository: repository as any,
+      notifications: notifications as any,
+    });
+
+    expect(loanFind).toHaveBeenCalledWith({
+      status: { $in: [LoanStatus.Overdue, LoanStatus.Active] },
+      returnDate: null,
+      dueDate: {
+        $lt: new Date('2026-04-13T00:00:00.000Z'),
+      },
+    });
+    expect(summary.finesCreated).toBe(3);
+    expect(insertedFineRecords).toHaveLength(3);
+  });
+
+  it('does not duplicate legacy aggregate overdue fines', async () => {
+    const { LoanStatus } = await import('../../../src/common/types/enums');
+    const { loanId, memberId, overdueLoan } = createLoanFixtures();
+    const insertedFineRecords: Array<{
+      loanId: Types.ObjectId;
+      memberId: Types.ObjectId;
+      overdueDate: Date;
+      amount: number;
+      status: string;
+      note: string;
+    }> = [];
+    const legacyFineRecord = {
+      loanId,
+      memberId,
+      overdueDate: overdueLoan.dueDate,
+      amount: 10000,
+    };
+    const loanFind = jest.fn().mockReturnValue({
+      sort: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue([
+          {
+            ...overdueLoan,
+            status: LoanStatus.Overdue,
+          },
+        ]),
+      }),
+    });
+    const fineFind = jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue([legacyFineRecord]),
+      }),
+    });
+    const insertMany = jest.fn().mockImplementation(async (records: typeof insertedFineRecords) => {
+      insertedFineRecords.push(...records);
+      return records;
+    });
+
+    jest.doMock('../../../src/models/LoanRecord.model', () => ({
+      LoanRecordModel: {
+        find: loanFind,
+      },
+    }));
+    jest.doMock('../../../src/models/FineRecord.model', () => ({
+      FineRecordModel: {
+        find: fineFind,
+        insertMany,
+      },
+    }));
+
+    const repository = {
+      listFineRates: jest.fn().mockResolvedValue([
+        {
+          ratePerDay: 5000,
+          effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        },
+      ]),
+      findMemberById: jest.fn().mockResolvedValue({ isBlocked: false }),
+      sumUnpaidFines: jest.fn().mockResolvedValue(0),
+      updateMemberBlockedStatus: jest.fn(),
+    };
+    const notifications = {
+      enqueueAccountBlocked: jest.fn(),
+      enqueueAccountActivated: jest.fn(),
+    };
+
+    const { runFineCalculationJob } = await import('../../../src/jobs/fineCalculation.job');
+
+    const summary = await runFineCalculationJob({
+      now: new Date('2026-04-13T08:00:00.000Z'),
+      repository: repository as any,
+      notifications: notifications as any,
+    });
+
+    expect(summary.fineCandidates).toBe(1);
+    expect(summary.finesCreated).toBe(1);
+    expect(insertedFineRecords).toEqual([
+      expect.objectContaining({
+        loanId,
+        memberId,
+        overdueDate: new Date('2026-04-13T00:00:00.000Z'),
+        amount: 5000,
+      }),
+    ]);
+  });
+
+  it('uses Vietnam calendar date when calculating the current overdue day', async () => {
+    const { LoanStatus } = await import('../../../src/common/types/enums');
+    const { overdueLoan } = createLoanFixtures();
+    const insertedFineRecords: Array<{
+      loanId: Types.ObjectId;
+      memberId: Types.ObjectId;
+      overdueDate: Date;
+      amount: number;
+      status: string;
+      note: string;
+    }> = [];
+    const loanFind = jest.fn().mockReturnValue({
+      sort: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue([
+          {
+            ...overdueLoan,
+            status: LoanStatus.Overdue,
+          },
+        ]),
+      }),
+    });
+    const fineFind = jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue([]),
+      }),
+    });
+    const insertMany = jest.fn().mockImplementation(async (records: typeof insertedFineRecords) => {
+      insertedFineRecords.push(...records);
+      return records;
+    });
+
+    jest.doMock('../../../src/models/LoanRecord.model', () => ({
+      LoanRecordModel: {
+        find: loanFind,
+      },
+    }));
+    jest.doMock('../../../src/models/FineRecord.model', () => ({
+      FineRecordModel: {
+        find: fineFind,
+        insertMany,
+      },
+    }));
+
+    const repository = {
+      listFineRates: jest.fn().mockResolvedValue([
+        {
+          ratePerDay: 5000,
+          effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        },
+      ]),
+      findMemberById: jest.fn().mockResolvedValue({ isBlocked: false }),
+      sumUnpaidFines: jest.fn().mockResolvedValue(0),
+      updateMemberBlockedStatus: jest.fn(),
+    };
+    const notifications = {
+      enqueueAccountBlocked: jest.fn(),
+      enqueueAccountActivated: jest.fn(),
+    };
+
+    const { runFineCalculationJob } = await import('../../../src/jobs/fineCalculation.job');
+
+    const summary = await runFineCalculationJob({
+      now: new Date('2026-04-12T17:05:00.000Z'),
+      repository: repository as any,
+      notifications: notifications as any,
+    });
+
+    expect(loanFind).toHaveBeenCalledWith({
+      status: { $in: [LoanStatus.Overdue, LoanStatus.Active] },
+      returnDate: null,
+      dueDate: {
+        $lt: new Date('2026-04-13T00:00:00.000Z'),
+      },
+    });
+    expect(summary.finesCreated).toBe(3);
+    expect(insertedFineRecords.map((fine) => fine.overdueDate)).toEqual([
+      new Date('2026-04-11T00:00:00.000Z'),
+      new Date('2026-04-12T00:00:00.000Z'),
+      new Date('2026-04-13T00:00:00.000Z'),
+    ]);
   });
 
   it('is idempotent when run multiple times', async () => {

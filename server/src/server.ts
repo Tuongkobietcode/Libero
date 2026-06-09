@@ -6,7 +6,7 @@ import { closeDatabaseConnection, connectToDatabase } from './config/database';
 import { env } from './config/env';
 import { closeJobQueues } from './config/queue';
 import { closeRedisConnection, connectToRedis } from './config/redis';
-import { registerJobs, type JobRuntime } from './jobs';
+import { registerJobs, runOverdueFineMaintenance, type JobRuntime } from './jobs';
 import { disconnectRealtime, initializeRealtime } from './realtime/realtime';
 
 const server = http.createServer(app);
@@ -20,6 +20,14 @@ async function startServer(): Promise<void> {
 
   try {
     await connectToRedis();
+    try {
+      await runOverdueFineMaintenance();
+    } catch (error: unknown) {
+      logger.warn(
+        { err: error },
+        'Initial overdue fine maintenance failed; background jobs will retry when available',
+      );
+    }
     jobRuntime = await registerJobs();
   } catch (error: unknown) {
     if (env.NODE_ENV === 'production') {

@@ -8,8 +8,10 @@ export const loginSchema = z.object({
 export const registerSchema = z.object({
   fullName: z.string().min(2).max(200),
   email: z.string().email(),
-  phone: z.string().trim().min(1).optional(),
-  studentId: z.string().trim().min(1).optional(),
+  phone: z.string().trim().min(1),
+  studentId: z.string().trim().min(1),
+  faculty: z.string().trim().min(1),
+  className: z.string().trim().min(1),
   password: z
     .string()
     .min(8)

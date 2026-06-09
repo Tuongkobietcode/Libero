@@ -34,7 +34,7 @@ function BlockedNotice() {
         <div>
           <h2 className="m-0 text-base font-black text-red-700">Tài khoản của bạn đang bị khóa do còn khoản phạt chưa xử lý.</h2>
           <p className="m-0 mt-2 max-w-3xl text-sm font-semibold leading-6 text-red-700/80">
-            Vui lòng liên hệ thủ thư để thanh toán hoặc đối soát khoản phạt. Reader hiện chỉ hiển thị dữ liệu tiền phạt, xác nhận thanh toán được thực hiện ở backoffice.
+          Vui lòng liên hệ thủ thư để thanh toán hoặc đối soát khoản phạt tại quầy ở thư viện.
           </p>
         </div>
       </div>

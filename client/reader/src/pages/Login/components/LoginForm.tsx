@@ -79,6 +79,7 @@ export function LoginForm() {
 
       <div className="flex items-center justify-between gap-4 text-sm">
         <Checkbox
+          name="rememberMe"
           label="Ghi nhớ đăng nhập"
           checked={rememberMe}
           onChange={(e) => setRememberMe(e.target.checked)}

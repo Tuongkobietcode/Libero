@@ -45,8 +45,6 @@ interface DemoMemberSeed {
   faculty?: string;
   className?: string;
   phone?: string;
-  campus?: string;
-  libraryBranch?: string;
   membershipTier?: string;
 }
 
@@ -128,8 +126,6 @@ const STUDENT_MEMBERS: DemoMemberSeed[] = STUDENT_NAMES.map((fullName, index) =>
     faculty: major.faculty,
     className: major.className,
     phone: `09${String(32000000 + index).padStart(8, '0')}`,
-    campus: index % 2 === 0 ? 'Cơ sở 1' : 'Cơ sở 2',
-    libraryBranch: index % 2 === 0 ? 'Thư viện Trung tâm' : 'Thư viện Cơ sở 2',
     membershipTier: index % 5 === 0 ? 'priority' : 'standard',
   };
 });
@@ -147,8 +143,6 @@ const LECTURER_MEMBERS: DemoMemberSeed[] = [
   cardNo: `MEM-2026-02${String(index + 1).padStart(3, '0')}`,
   faculty,
   phone: `08${String(88000000 + index).padStart(8, '0')}`,
-  campus: 'Cơ sở 1',
-  libraryBranch: 'Thư viện Trung tâm',
   membershipTier: 'faculty',
 }));
 
@@ -159,8 +153,6 @@ const LIBRARIAN_MEMBERS: DemoMemberSeed[] = [
     role: Role.Librarian,
     cardNo: 'MEM-2026-03001',
     phone: '0901000001',
-    campus: 'Cơ sở 1',
-    libraryBranch: 'Thư viện Trung tâm',
     membershipTier: 'staff',
   },
   {
@@ -169,8 +161,6 @@ const LIBRARIAN_MEMBERS: DemoMemberSeed[] = [
     role: Role.Librarian,
     cardNo: 'MEM-2026-03002',
     phone: '0901000002',
-    campus: 'Cơ sở 2',
-    libraryBranch: 'Thư viện Cơ sở 2',
     membershipTier: 'staff',
   },
 ];
@@ -581,7 +571,7 @@ async function dropLegacyTextIndex(): Promise<void> {
     await BookModel.collection.dropIndex('title_text_isbn_text');
   } catch (error: unknown) {
     const code = typeof error === 'object' && error !== null && 'codeName' in error ? error.codeName : undefined;
-    if (code !== 'IndexNotFound') {
+    if (code !== 'IndexNotFound' && code !== 'NamespaceNotFound') {
       throw error;
     }
   }
@@ -682,8 +672,6 @@ async function upsertMember(seed: DemoMemberSeed & { password: string }, options
       faculty: seed.faculty,
       className: seed.className,
       phone: seed.phone,
-      campus: seed.campus,
-      libraryBranch: seed.libraryBranch,
       membershipTier: seed.membershipTier,
       lastLoginAt: addDays(DEMO_NOW, -2),
       passwordUpdatedAt: EFFECTIVE_FROM,
@@ -701,8 +689,6 @@ async function upsertMember(seed: DemoMemberSeed & { password: string }, options
   existing.faculty = seed.faculty;
   existing.className = seed.className;
   existing.phone = seed.phone;
-  existing.campus = seed.campus;
-  existing.libraryBranch = seed.libraryBranch;
   existing.membershipTier = seed.membershipTier;
   existing.passwordUpdatedAt = existing.passwordUpdatedAt ?? EFFECTIVE_FROM;
 
@@ -728,8 +714,6 @@ async function seedAdminUser(options: MemberSeedOptions): Promise<string> {
     cardNo: DEFAULT_ADMIN_CARD_NO,
     password: DEFAULT_ADMIN_PASSWORD,
     phone: '0900000000',
-    campus: 'Cơ sở 1',
-    libraryBranch: 'Thư viện Trung tâm',
     membershipTier: 'admin',
   }, options);
 }

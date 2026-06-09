@@ -1,11 +1,11 @@
 import type { FineRateDocument } from '../../models/FineRate.model';
 import { NotFoundError } from '../errors/AppError';
 import { ERR } from '../errors/errorCodes';
-import { addDays, startOfUtcDay } from './dateHelpers';
+import { addDays, startOfVietnamCalendarDay } from './dateHelpers';
 
 export function buildOverdueDates(dueDate: Date, endDate: Date): Date[] {
-  const overdueStart = startOfUtcDay(addDays(dueDate, 1));
-  const overdueEnd = startOfUtcDay(endDate);
+  const overdueStart = startOfVietnamCalendarDay(addDays(dueDate, 1));
+  const overdueEnd = startOfVietnamCalendarDay(endDate);
 
   if (overdueStart.getTime() > overdueEnd.getTime()) {
     return [];

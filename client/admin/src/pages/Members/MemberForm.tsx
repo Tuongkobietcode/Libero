@@ -17,6 +17,8 @@ interface MemberFormValues {
   password?: string;
   phone?: string;
   studentId?: string;
+  faculty?: string;
+  className?: string;
   role: Role;
   joinDate?: dayjs.Dayjs;
   expiryDate?: dayjs.Dayjs;
@@ -46,6 +48,8 @@ export default function MemberFormPage() {
       email: memberQuery.data.email,
       phone: memberQuery.data.phone,
       studentId: memberQuery.data.studentId,
+      faculty: memberQuery.data.faculty,
+      className: memberQuery.data.className,
       role: memberQuery.data.role,
       joinDate: memberQuery.data.joinDate ? dayjs(memberQuery.data.joinDate) : undefined,
       expiryDate: memberQuery.data.expiryDate ? dayjs(memberQuery.data.expiryDate) : undefined,
@@ -110,6 +114,12 @@ export default function MemberFormPage() {
               <Input />
             </Form.Item>
             <Form.Item label="Mã sinh viên" name="studentId">
+              <Input />
+            </Form.Item>
+            <Form.Item label="Khoa" name="faculty">
+              <Input />
+            </Form.Item>
+            <Form.Item label="Lớp" name="className">
               <Input />
             </Form.Item>
             <Form.Item label="Vai trò" name="role" rules={[{ required: true }]}>

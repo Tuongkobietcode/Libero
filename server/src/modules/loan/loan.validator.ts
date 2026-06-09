@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { LoanStatus } from '../../common/types/enums';
+import { LoanStatus, Role } from '../../common/types/enums';
 
 const objectIdPattern = /^[a-f0-9]{24}$/i;
 
@@ -38,4 +38,5 @@ export const loanHistoryQuerySchema = z.object({
 
 export const listLoansQuerySchema = loanHistoryQuerySchema.extend({
   memberId: z.string().regex(objectIdPattern, 'Invalid member id').optional(),
+  role: z.nativeEnum(Role).optional(),
 });

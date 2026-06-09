@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 
 import {
+  AuthenticationError,
   BusinessRuleError,
   ConflictError,
   NotFoundError,
@@ -9,6 +10,7 @@ import {
 import { ERR } from '../../common/errors/errorCodes';
 import { FineStatus, LoanStatus, MemberStatus, ReservationStatus, Role } from '../../common/types/enums';
 import { writeAuditLog } from '../../common/utils/auditLogger';
+import { addDays } from '../../common/utils/dateHelpers';
 import { invalidateMemberCache } from '../../common/utils/memberCache';
 import { buildPagination, buildPaginationResult } from '../../common/utils/pagination';
 import { logger } from '../../common/middleware/requestLogger';
@@ -21,6 +23,7 @@ import type { MemberAuthDocument } from './auth.types';
 import { memberRepository, type MemberRepository } from './member.repository';
 import type {
   CreateManagedMemberDto,
+  ChangeMyPasswordDto,
   ListMembersQuery,
   LoanPolicyRole,
   LoanPolicyUpdateDto,
@@ -35,9 +38,22 @@ import type {
 } from './member.types';
 
 const PASSWORD_BCRYPT_COST = 12;
+const DEFAULT_MEMBERSHIP_DAYS = 365;
 const loanPolicyRoleOrder: LoanPolicyRole[] = [Role.Student, Role.Lecturer, Role.Librarian];
 
+function resolveMembershipDates(member: MemberAuthDocument): { joinDate: Date; expiryDate: Date } {
+  const joinDate = member.joinDate ?? member.createdAt;
+  const expiryDate = member.expiryDate ?? addDays(joinDate, DEFAULT_MEMBERSHIP_DAYS);
+
+  return {
+    joinDate,
+    expiryDate,
+  };
+}
+
 function toMemberView(member: MemberAuthDocument): MemberView {
+  const membershipDates = resolveMembershipDates(member);
+
   return {
     _id: member.id,
     fullName: member.fullName,
@@ -50,12 +66,10 @@ function toMemberView(member: MemberAuthDocument): MemberView {
     isBlocked: member.isBlocked,
     failedLoginCount: member.failedLoginCount,
     lockedUntil: member.lockedUntil,
-    joinDate: member.joinDate,
-    expiryDate: member.expiryDate,
+    joinDate: membershipDates.joinDate,
+    expiryDate: membershipDates.expiryDate,
     faculty: member.faculty,
     className: member.className,
-    campus: member.campus,
-    libraryBranch: member.libraryBranch,
     membershipTier: member.membershipTier,
     lastLoginAt: member.lastLoginAt,
     passwordUpdatedAt: member.passwordUpdatedAt,
@@ -87,32 +101,38 @@ export class MemberService {
 
   async createMember(input: CreateManagedMemberDto, actor?: RequestActor): Promise<MemberView> {
     const normalizedEmail = input.email.toLowerCase();
+    const normalizedStudentId = input.studentId?.trim();
+    const normalizedPhone = input.phone?.trim();
 
     if (await this.repository.emailExists(normalizedEmail)) {
       throw new ConflictError(ERR.MEM_EMAIL_EXISTS, 409, 'Email already exists');
     }
 
-    if (input.studentId && (await this.repository.studentIdExists(input.studentId))) {
+    if (normalizedStudentId && (await this.repository.studentIdExists(normalizedStudentId))) {
       throw new ConflictError(ERR.MEM_STUDENT_ID_EXISTS, 409, 'Student ID already exists');
+    }
+
+    if (normalizedPhone && (await this.repository.phoneExists(normalizedPhone))) {
+      throw new ConflictError(ERR.MEM_PHONE_EXISTS, 409, 'Phone already exists');
     }
 
     const passwordHash = await bcrypt.hash(input.password, PASSWORD_BCRYPT_COST);
     const memberCardNo = await this.repository.getNextMemberCardNo();
+    const joinDate = input.joinDate ?? new Date();
+    const expiryDate = input.expiryDate ?? addDays(joinDate, DEFAULT_MEMBERSHIP_DAYS);
     const member = await this.repository.createMember({
       fullName: input.fullName,
       email: normalizedEmail,
       passwordHash,
-      phone: input.phone,
-      studentId: input.studentId,
+      phone: normalizedPhone,
+      studentId: normalizedStudentId,
       role: input.role,
       memberCardNo,
       status: MemberStatus.Active,
-      joinDate: input.joinDate,
-      expiryDate: input.expiryDate,
+      joinDate,
+      expiryDate,
       faculty: input.faculty,
       className: input.className,
-      campus: input.campus,
-      libraryBranch: input.libraryBranch,
       membershipTier: input.membershipTier,
       passwordUpdatedAt: new Date(),
       isBlocked: false,
@@ -132,6 +152,8 @@ export class MemberService {
     if (!member) {
       throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
     }
+
+    await this.ensureMembershipDates(member);
 
     return toMemberView(member);
   }
@@ -280,6 +302,10 @@ export class MemberService {
       filter.status = query.status;
     }
 
+    if (query.cardStatus) {
+      filter.isBlocked = query.cardStatus === 'blocked';
+    }
+
     if (query.memberCardNo) {
       filter.memberCardNo = query.memberCardNo.trim();
     }
@@ -299,6 +325,8 @@ export class MemberService {
       limit: pagination.limit,
     });
 
+    await Promise.all(members.map((member) => this.ensureMembershipDates(member)));
+
     return buildPaginationResult(members.map((member) => toMemberView(member)), total, pagination);
   }
 
@@ -310,63 +338,7 @@ export class MemberService {
     }
 
     const normalizedEmail = input.email?.toLowerCase();
-
-    if (
-      normalizedEmail &&
-      normalizedEmail !== currentMember.email &&
-      (await this.repository.emailExists(normalizedEmail, currentMember.id))
-    ) {
-      throw new ConflictError(ERR.MEM_EMAIL_EXISTS, 409, 'Email already exists');
-    }
-
-    if (
-      input.studentId &&
-      input.studentId !== currentMember.studentId &&
-      (await this.repository.studentIdExists(input.studentId, currentMember.id))
-    ) {
-      throw new ConflictError(ERR.MEM_STUDENT_ID_EXISTS, 409, 'Student ID already exists');
-    }
-
-    const updatedMember = await this.repository.findMemberByIdAndUpdate(memberId, {
-      $set: {
-        ...(input.fullName !== undefined ? { fullName: input.fullName } : {}),
-        ...(normalizedEmail !== undefined ? { email: normalizedEmail } : {}),
-        ...(input.phone !== undefined ? { phone: input.phone } : {}),
-        ...(input.studentId !== undefined ? { studentId: input.studentId } : {}),
-        ...(input.role !== undefined ? { role: input.role } : {}),
-        ...(input.joinDate !== undefined ? { joinDate: input.joinDate } : {}),
-        ...(input.expiryDate !== undefined ? { expiryDate: input.expiryDate } : {}),
-        ...(input.faculty !== undefined ? { faculty: input.faculty } : {}),
-        ...(input.className !== undefined ? { className: input.className } : {}),
-        ...(input.campus !== undefined ? { campus: input.campus } : {}),
-        ...(input.libraryBranch !== undefined ? { libraryBranch: input.libraryBranch } : {}),
-        ...(input.membershipTier !== undefined ? { membershipTier: input.membershipTier } : {}),
-      },
-    });
-
-    if (!updatedMember) {
-      throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
-    }
-
-    if (input.role !== undefined && input.role !== currentMember.role) {
-      await invalidateMemberCache(memberId);
-    }
-
-    const before = toMemberView(currentMember);
-    const after = toMemberView(updatedMember);
-    this.writeAudit(actor, 'UPDATE_MEMBER', 'Member', updatedMember.id, before, after);
-
-    return after;
-  }
-
-  async updateMyProfile(memberId: string, input: UpdateMyProfileDto, actor?: RequestActor): Promise<MemberView> {
-    const currentMember = await this.repository.findMemberById(memberId);
-
-    if (!currentMember) {
-      throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
-    }
-
-    const normalizedEmail = input.email?.toLowerCase();
+    const normalizedPhone = input.phone?.trim();
     const normalizedStudentId = input.studentId?.trim();
 
     if (
@@ -385,7 +357,82 @@ export class MemberService {
       throw new ConflictError(ERR.MEM_STUDENT_ID_EXISTS, 409, 'Student ID already exists');
     }
 
-    const optionalProfileFields = ['phone', 'studentId', 'faculty', 'className', 'campus'] as const;
+    if (
+      normalizedPhone &&
+      normalizedPhone !== currentMember.phone &&
+      (await this.repository.phoneExists(normalizedPhone, currentMember.id))
+    ) {
+      throw new ConflictError(ERR.MEM_PHONE_EXISTS, 409, 'Phone already exists');
+    }
+
+    const updatedMember = await this.repository.findMemberByIdAndUpdate(memberId, {
+      $set: {
+        ...(input.fullName !== undefined ? { fullName: input.fullName } : {}),
+        ...(normalizedEmail !== undefined ? { email: normalizedEmail } : {}),
+        ...(normalizedPhone !== undefined ? { phone: normalizedPhone } : {}),
+        ...(normalizedStudentId !== undefined ? { studentId: normalizedStudentId } : {}),
+        ...(input.role !== undefined ? { role: input.role } : {}),
+        ...(input.joinDate !== undefined ? { joinDate: input.joinDate } : {}),
+        ...(input.expiryDate !== undefined ? { expiryDate: input.expiryDate } : {}),
+        ...(input.faculty !== undefined ? { faculty: input.faculty } : {}),
+        ...(input.className !== undefined ? { className: input.className } : {}),
+        ...(input.membershipTier !== undefined ? { membershipTier: input.membershipTier } : {}),
+      },
+    });
+
+    if (!updatedMember) {
+      throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
+    }
+
+    if (input.role !== undefined && input.role !== currentMember.role) {
+      await invalidateMemberCache(memberId);
+    }
+
+    await this.ensureMembershipDates(updatedMember);
+
+    const before = toMemberView(currentMember);
+    const after = toMemberView(updatedMember);
+    this.writeAudit(actor, 'UPDATE_MEMBER', 'Member', updatedMember.id, before, after);
+
+    return after;
+  }
+
+  async updateMyProfile(memberId: string, input: UpdateMyProfileDto, actor?: RequestActor): Promise<MemberView> {
+    const currentMember = await this.repository.findMemberById(memberId);
+
+    if (!currentMember) {
+      throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
+    }
+
+    const normalizedEmail = input.email?.toLowerCase();
+    const normalizedStudentId = input.studentId?.trim();
+    const normalizedPhone = input.phone?.trim();
+
+    if (
+      normalizedEmail &&
+      normalizedEmail !== currentMember.email &&
+      (await this.repository.emailExists(normalizedEmail, currentMember.id))
+    ) {
+      throw new ConflictError(ERR.MEM_EMAIL_EXISTS, 409, 'Email already exists');
+    }
+
+    if (
+      normalizedStudentId &&
+      normalizedStudentId !== currentMember.studentId &&
+      (await this.repository.studentIdExists(normalizedStudentId, currentMember.id))
+    ) {
+      throw new ConflictError(ERR.MEM_STUDENT_ID_EXISTS, 409, 'Student ID already exists');
+    }
+
+    if (
+      normalizedPhone &&
+      normalizedPhone !== currentMember.phone &&
+      (await this.repository.phoneExists(normalizedPhone, currentMember.id))
+    ) {
+      throw new ConflictError(ERR.MEM_PHONE_EXISTS, 409, 'Phone already exists');
+    }
+
+    const optionalProfileFields = ['studentId', 'faculty', 'className'] as const;
     const $set: Record<string, string> = {};
     const $unset: Record<string, ''> = {};
 
@@ -395,6 +442,14 @@ export class MemberService {
 
     if (normalizedEmail !== undefined) {
       $set.email = normalizedEmail;
+    }
+
+    if (normalizedPhone !== undefined) {
+      if (normalizedPhone === '') {
+        $unset.phone = '';
+      } else {
+        $set.phone = normalizedPhone;
+      }
     }
 
     for (const field of optionalProfileFields) {
@@ -427,9 +482,52 @@ export class MemberService {
       throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
     }
 
+    await this.ensureMembershipDates(updatedMember);
+
     const before = toMemberView(currentMember);
     const after = toMemberView(updatedMember);
     this.writeAudit(actor, 'UPDATE_MY_PROFILE', 'Member', updatedMember.id, before, after);
+
+    return after;
+  }
+
+  async changeMyPassword(memberId: string, input: ChangeMyPasswordDto, actor?: RequestActor): Promise<MemberView> {
+    const currentMember = await this.repository.findMemberById(memberId);
+
+    if (!currentMember) {
+      throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
+    }
+
+    if (!(await currentMember.comparePassword(input.currentPassword))) {
+      throw new AuthenticationError(ERR.AUTH_INVALID_CREDENTIALS, 401, 'Current password is incorrect');
+    }
+
+    if (await currentMember.comparePassword(input.newPassword)) {
+      throw new BusinessRuleError(ERR.COMMON_BAD_REQUEST, 422, 'New password must be different from current password');
+    }
+
+    const passwordUpdatedAt = new Date();
+    const passwordHash = await bcrypt.hash(input.newPassword, PASSWORD_BCRYPT_COST);
+    const updatedMember = await this.repository.findMemberByIdAndUpdate(memberId, {
+      $set: {
+        passwordHash,
+        passwordUpdatedAt,
+        failedLoginCount: 0,
+        lockedUntil: null,
+      },
+    });
+
+    if (!updatedMember) {
+      throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
+    }
+
+    await this.repository.revokeAllRefreshTokensForMember(memberId, passwordUpdatedAt);
+    await invalidateMemberCache(memberId);
+    await this.ensureMembershipDates(updatedMember);
+
+    const before = toMemberView(currentMember);
+    const after = toMemberView(updatedMember);
+    this.writeAudit(actor, 'CHANGE_MY_PASSWORD', 'Member', updatedMember.id, before, after);
 
     return after;
   }
@@ -571,6 +669,33 @@ export class MemberService {
     this.writeAudit(actor, 'UPDATE_LOAN_POLICY', 'LoanPolicy', updatedPolicy.id, before, after);
 
     return after;
+  }
+
+  private async ensureMembershipDates(member: MemberAuthDocument): Promise<void> {
+    const update: { joinDate?: Date; expiryDate?: Date } = {};
+    const joinDate = member.joinDate ?? member.createdAt;
+
+    if (!member.joinDate) {
+      update.joinDate = joinDate;
+    }
+
+    if (!member.expiryDate) {
+      update.expiryDate = addDays(joinDate, DEFAULT_MEMBERSHIP_DAYS);
+    }
+
+    if (Object.keys(update).length === 0) {
+      return;
+    }
+
+    await this.repository.updateMemberById(member.id, { $set: update });
+
+    if (update.joinDate) {
+      member.joinDate = update.joinDate;
+    }
+
+    if (update.expiryDate) {
+      member.expiryDate = update.expiryDate;
+    }
   }
 
   private async enqueueAccountBlockedNotification(memberId: string, reason: string): Promise<void> {

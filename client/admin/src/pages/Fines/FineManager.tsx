@@ -32,6 +32,18 @@ interface StatCardProps {
   tone: 'rose' | 'emerald' | 'amber' | 'indigo';
 }
 
+interface FineGroup {
+  memberId: string;
+  member: FineListItem['member'];
+  fines: FineListItem[];
+  totalAmount: number;
+  unpaidAmount: number;
+  unpaidCount: number;
+  paidCount: number;
+  waivedCount: number;
+  latestCreatedAt: string;
+}
+
 const statToneClassMap: Record<StatCardProps['tone'], string> = {
   rose: 'bg-rose-50 text-rose-600 ring-rose-100',
   emerald: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
@@ -51,10 +63,6 @@ function formatNumber(value?: number): string {
   }
 
   return new Intl.NumberFormat('vi-VN').format(value);
-}
-
-function getFineCode(fine: FineListItem): string {
-  return `FINE-${fine.createdAt.slice(0, 4)}-${fine._id.slice(-5).toUpperCase()}`;
 }
 
 function getLoanCode(fine: FineListItem): string {
@@ -78,6 +86,44 @@ function StatCard({ icon, label, count, amount, tone }: StatCardProps) {
 
 function StatusPill({ status }: { status: FineStatus }) {
   return <span className={`inline-flex rounded-lg px-3 py-1 text-xs font-extrabold ${fineStatusClassMap[status]}`}>{getStatusLabel(status)}</span>;
+}
+
+function buildFineGroups(fines: FineListItem[]): FineGroup[] {
+  const groups = new Map<string, FineGroup>();
+
+  fines.forEach((fine) => {
+    const current = groups.get(fine.member._id) ?? {
+      memberId: fine.member._id,
+      member: fine.member,
+      fines: [],
+      totalAmount: 0,
+      unpaidAmount: 0,
+      unpaidCount: 0,
+      paidCount: 0,
+      waivedCount: 0,
+      latestCreatedAt: fine.createdAt,
+    };
+
+    current.fines.push(fine);
+    current.totalAmount += fine.amount;
+
+    if (fine.status === FineStatus.Unpaid) {
+      current.unpaidAmount += fine.amount;
+      current.unpaidCount += 1;
+    } else if (fine.status === FineStatus.Paid) {
+      current.paidCount += 1;
+    } else {
+      current.waivedCount += 1;
+    }
+
+    if (new Date(fine.createdAt).getTime() > new Date(current.latestCreatedAt).getTime()) {
+      current.latestCreatedAt = fine.createdAt;
+    }
+
+    groups.set(fine.member._id, current);
+  });
+
+  return Array.from(groups.values()).sort((a, b) => b.unpaidAmount - a.unpaidAmount || b.totalAmount - a.totalAmount);
 }
 
 function getVisiblePages(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
@@ -110,9 +156,10 @@ export default function FineManagerPage() {
   const [selectedMemberLabel, setSelectedMemberLabel] = useState<string | undefined>();
   const [status, setStatus] = useState<FineStatusFilter>('all');
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(100);
   const [waiveReason, setWaiveReason] = useState('');
   const [waiveFine, setWaiveFine] = useState<FineListItem | null>(null);
+  const [selectedFineGroup, setSelectedFineGroup] = useState<FineGroup | null>(null);
 
   const finesQuery = useQuery({
     queryKey: ['fines', selectedMemberId, status, page, limit],
@@ -172,7 +219,7 @@ export default function FineManagerPage() {
   });
 
   const payMutation = useMutation({
-    mutationFn: (fineId: string) => fineApi.payFines([fineId]),
+    mutationFn: (fineIds: string[]) => fineApi.payFines(fineIds),
     onSuccess: (result) => {
       notify({ level: 'success', message: 'Đã ghi nhận thanh toán', description: `${result.updatedCount} khoản phạt đã được thanh toán.` });
       void queryClient.invalidateQueries({ queryKey: ['fines'] });
@@ -202,6 +249,7 @@ export default function FineManagerPage() {
   const endItem = pagination ? Math.min(pagination.page * pagination.limit, pagination.totalItems) : 0;
   const visiblePages = useMemo(() => getVisiblePages(page, totalPages), [page, totalPages]);
   const summary = finesQuery.data?.summary;
+  const fineGroups = useMemo(() => buildFineGroups(items), [items]);
 
   const resetFilters = () => {
     setSearch('');
@@ -327,22 +375,22 @@ export default function FineManagerPage() {
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
         <div className="overflow-x-auto">
-          <table className="min-w-[1480px] w-full border-collapse text-left">
+          <table className="min-w-[1180px] w-full border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 text-xs font-extrabold text-slate-600">
-                <th className="whitespace-nowrap px-5 py-5">Mã phạt</th>
                 <th className="whitespace-nowrap px-5 py-5">Độc giả</th>
-                <th className="whitespace-nowrap px-5 py-5">Liên quan</th>
-                <th className="whitespace-nowrap px-5 py-5">Lý do</th>
-                <th className="whitespace-nowrap px-5 py-5">Số tiền</th>
-                <th className="whitespace-nowrap px-5 py-5">Ngày tạo ↓</th>
-                <th className="whitespace-nowrap px-5 py-5">Trạng thái</th>
+                <th className="whitespace-nowrap px-5 py-5">Mã thẻ</th>
+                <th className="whitespace-nowrap px-5 py-5 text-center">Chưa thanh toán</th>
+                <th className="whitespace-nowrap px-5 py-5 text-right">Tổng phạt chưa thanh toán</th>
+                <th className="whitespace-nowrap px-5 py-5 text-center">Đã thanh toán</th>
+                <th className="whitespace-nowrap px-5 py-5 text-center">Miễn giảm</th>
+                <th className="whitespace-nowrap px-5 py-5">Phát sinh gần nhất</th>
                 <th className="whitespace-nowrap px-5 py-5 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {finesQuery.isLoading ? (
-                Array.from({ length: limit }).map((_, index) => (
+                Array.from({ length: 8 }).map((_, index) => (
                   <tr key={index}>
                     {Array.from({ length: 8 }).map((__, cellIndex) => (
                       <td className="px-5 py-5" key={cellIndex}>
@@ -351,56 +399,43 @@ export default function FineManagerPage() {
                     ))}
                   </tr>
                 ))
-              ) : items.length ? (
-                items.map((fine) => (
-                  <tr className="text-sm font-semibold text-slate-700 transition hover:bg-slate-50" key={fine._id}>
-                    <td className="whitespace-nowrap px-5 py-4 font-extrabold text-slate-800">{getFineCode(fine)}</td>
+              ) : fineGroups.length ? (
+                fineGroups.map((group) => (
+                  <tr className="text-sm font-semibold text-slate-700 transition hover:bg-slate-50" key={group.memberId}>
                     <td className="px-5 py-4">
-                      <p className="m-0 max-w-[260px] truncate whitespace-nowrap font-extrabold text-slate-900">{fine.member.fullName}</p>
-                      <p className="m-0 mt-1 max-w-[260px] truncate whitespace-nowrap text-xs text-slate-500">{fine.member.memberCardNo}</p>
+                      <p className="m-0 max-w-[280px] truncate whitespace-nowrap font-extrabold text-slate-900">{group.member.fullName}</p>
+                      <p className="m-0 mt-1 max-w-[280px] truncate whitespace-nowrap text-xs text-slate-500">{group.member.email}</p>
                     </td>
+                    <td className="whitespace-nowrap px-5 py-4 font-extrabold text-slate-800">{group.member.memberCardNo}</td>
+                    <td className="whitespace-nowrap px-5 py-4 text-center font-extrabold text-rose-600">{formatNumber(group.unpaidCount)}</td>
+                    <td className="whitespace-nowrap px-5 py-4 text-right font-extrabold text-rose-600">{formatCurrency(group.unpaidAmount)}</td>
+                    <td className="whitespace-nowrap px-5 py-4 text-center font-extrabold text-emerald-600">{formatNumber(group.paidCount)}</td>
+                    <td className="whitespace-nowrap px-5 py-4 text-center font-extrabold text-amber-600">{formatNumber(group.waivedCount)}</td>
                     <td className="px-5 py-4">
-                      <p className="m-0 whitespace-nowrap font-semibold text-slate-900">Phiếu mượn</p>
-                      <p className="m-0 mt-1 whitespace-nowrap text-xs font-extrabold text-indigo-700">{getLoanCode(fine)}</p>
-                    </td>
-                    <td className="px-5 py-4">
-                      <p className="m-0 max-w-[340px] truncate whitespace-nowrap">{fine.note ?? 'Khoản phạt phát sinh'}</p>
-                      <p className="m-0 mt-1 max-w-[340px] truncate whitespace-nowrap text-xs text-slate-500">({fine.book.title})</p>
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-4 font-extrabold text-rose-600">{formatCurrency(fine.amount)}</td>
-                    <td className="px-5 py-4">
-                      <p className="m-0 whitespace-nowrap font-semibold text-slate-900">{formatDate(fine.createdAt)}</p>
-                      <p className="m-0 mt-1 whitespace-nowrap text-xs text-slate-500">{formatDateTime(fine.createdAt).slice(11)}</p>
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-4">
-                      <StatusPill status={fine.status} />
+                      <p className="m-0 whitespace-nowrap font-semibold text-slate-900">{formatDate(group.latestCreatedAt)}</p>
+                      <p className="m-0 mt-1 whitespace-nowrap text-xs text-slate-500">{group.fines.length} khoản chi tiết</p>
                     </td>
                     <td className="whitespace-nowrap px-5 py-4">
                       <div className="flex justify-end gap-2">
-                        <button className="h-9 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600" type="button">
+                        <button
+                          className="h-9 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600"
+                          type="button"
+                          onClick={() => setSelectedFineGroup(group)}
+                        >
                           Xem chi tiết
                         </button>
-                        {fine.status === FineStatus.Unpaid ? (
+                        {group.unpaidCount > 0 ? (
                           <button
                             className="h-9 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-600"
                             type="button"
                             disabled={payMutation.isPending}
-                            onClick={() => payMutation.mutate(fine._id)}
+                            onClick={() => payMutation.mutate(group.fines.filter((fine) => fine.status === FineStatus.Unpaid).map((fine) => fine._id))}
                           >
                             Ghi nhận thanh toán
                           </button>
                         ) : (
                           <span className="grid h-9 min-w-[150px] place-items-center text-slate-400">-</span>
                         )}
-                        {fine.status === FineStatus.Unpaid ? (
-                          <button
-                            className="h-9 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:border-amber-200 hover:text-amber-600"
-                            type="button"
-                            onClick={() => setWaiveFine(fine)}
-                          >
-                            Miễn giảm
-                          </button>
-                        ) : null}
                         <Tooltip title="Tác vụ khác">
                           <button className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600" type="button">
                             <EllipsisOutlined />
@@ -436,7 +471,7 @@ export default function FineManagerPage() {
                 }}
                 wrapperClassName="w-32"
               >
-                {[10, 20, 50].map((pageSize) => (
+                {[10, 20, 50, 100].map((pageSize) => (
                   <option value={pageSize} key={pageSize}>
                     {pageSize} / trang
                   </option>
@@ -470,6 +505,80 @@ export default function FineManagerPage() {
           </div>
         ) : null}
       </section>
+
+      <Modal
+        title={selectedFineGroup ? `Chi tiết tiền phạt - ${selectedFineGroup.member.fullName}` : 'Chi tiết tiền phạt'}
+        open={Boolean(selectedFineGroup)}
+        onCancel={() => setSelectedFineGroup(null)}
+        footer={null}
+        width={980}
+      >
+        {selectedFineGroup ? (
+          <div className="space-y-4">
+            <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-3">
+              <div>
+                <p className="m-0 text-xs font-black uppercase tracking-[0.08em] text-slate-400">Mã thẻ</p>
+                <p className="m-0 mt-1 font-extrabold text-slate-900">{selectedFineGroup.member.memberCardNo}</p>
+              </div>
+              <div>
+                <p className="m-0 text-xs font-black uppercase tracking-[0.08em] text-slate-400">Khoản chưa thanh toán</p>
+                <p className="m-0 mt-1 font-extrabold text-rose-600">{selectedFineGroup.unpaidCount} khoản</p>
+              </div>
+              <div>
+                <p className="m-0 text-xs font-black uppercase tracking-[0.08em] text-slate-400">Tổng cần thu</p>
+                <p className="m-0 mt-1 font-extrabold text-rose-600">{formatCurrency(selectedFineGroup.unpaidAmount)}</p>
+              </div>
+            </div>
+
+            <div className="max-h-[520px] overflow-auto rounded-2xl border border-slate-200">
+              <table className="min-w-[860px] w-full border-collapse text-left text-sm">
+                <thead className="sticky top-0 bg-white">
+                  <tr className="border-b border-slate-200 text-xs font-extrabold text-slate-600">
+                    <th className="px-4 py-3">Ngày phát sinh</th>
+                    <th className="px-4 py-3">Sách</th>
+                    <th className="px-4 py-3">Phiếu mượn</th>
+                    <th className="px-4 py-3">Số tiền</th>
+                    <th className="px-4 py-3">Trạng thái</th>
+                    <th className="px-4 py-3 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {selectedFineGroup.fines.map((fine) => (
+                    <tr key={fine._id}>
+                      <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-800">
+                        <p className="m-0">{formatDate(fine.overdueDate)}</p>
+                        <p className="m-0 mt-1 text-xs text-slate-500">{formatDateTime(fine.createdAt)}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="m-0 max-w-[240px] truncate font-extrabold text-slate-900">{fine.book.title}</p>
+                        <p className="m-0 mt-1 max-w-[240px] truncate text-xs text-slate-500">{fine.note ?? 'Khoản phạt phát sinh'}</p>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 font-extrabold text-indigo-700">{getLoanCode(fine)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-extrabold text-rose-600">{formatCurrency(fine.amount)}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <StatusPill status={fine.status} />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        {fine.status === FineStatus.Unpaid ? (
+                          <button
+                            className="h-9 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:border-amber-200 hover:text-amber-600"
+                            type="button"
+                            onClick={() => setWaiveFine(fine)}
+                          >
+                            Miễn giảm
+                          </button>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal
         title="Miễn giảm khoản phạt"

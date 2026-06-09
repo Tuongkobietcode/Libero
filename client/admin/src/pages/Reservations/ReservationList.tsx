@@ -79,6 +79,15 @@ function StatusPill({ status }: { status: ReservationStatus }) {
   return <span className={`inline-flex rounded-lg px-3 py-1 text-xs font-extrabold ${reservationStatusClassMap[status]}`}>{getStatusLabel(status)}</span>;
 }
 
+function DetailField({ label, value }: { label: string; value?: ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <p className="m-0 text-xs font-black uppercase tracking-[0.08em] text-slate-400">{label}</p>
+      <div className="mt-2 text-sm font-extrabold text-slate-900">{value ?? '-'}</div>
+    </div>
+  );
+}
+
 function getVisiblePages(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
   if (totalPages <= 7) {
     return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -115,6 +124,7 @@ export default function ReservationListPage() {
   const [createBookSearch, setCreateBookSearch] = useState('');
   const [reservationMember, setReservationMember] = useState<MemberView | null>(null);
   const [reservationBook, setReservationBook] = useState<BookListItem | null>(null);
+  const [selectedReservation, setSelectedReservation] = useState<ReservationListItem | null>(null);
 
   const reservationsQuery = useQuery({
     queryKey: ['reservations', selectedMemberId, status, page, limit],
@@ -473,7 +483,11 @@ export default function ReservationListPage() {
                     </td>
                     <td className="whitespace-nowrap px-5 py-4">
                       <div className="flex justify-end gap-2">
-                        <button className="h-9 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600" type="button">
+                        <button
+                          className="h-9 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600"
+                          type="button"
+                          onClick={() => setSelectedReservation(reservation)}
+                        >
                           Xem chi tiết
                         </button>
                         {reservation.status === ReservationStatus.Notified ? (
@@ -563,6 +577,47 @@ export default function ReservationListPage() {
           </div>
         ) : null}
       </section>
+
+      <Modal
+        title={selectedReservation ? `Chi tiết đặt chỗ ${getReservationCode(selectedReservation)}` : 'Chi tiết đặt chỗ'}
+        open={Boolean(selectedReservation)}
+        onCancel={() => setSelectedReservation(null)}
+        footer={null}
+        width={760}
+      >
+        {selectedReservation ? (
+          <div className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <DetailField
+                label="Độc giả"
+                value={
+                  <div>
+                    <p className="m-0">{selectedReservation.member.fullName}</p>
+                    <p className="m-0 mt-1 text-xs font-semibold text-slate-500">
+                      {selectedReservation.member.memberCardNo} - {selectedReservation.member.email}
+                    </p>
+                  </div>
+                }
+              />
+              <DetailField
+                label="Sách"
+                value={
+                  <div>
+                    <p className="m-0">{selectedReservation.book.title}</p>
+                    <p className="m-0 mt-1 text-xs font-semibold text-slate-500">{formatList(selectedReservation.book.authors)}</p>
+                  </div>
+                }
+              />
+              <DetailField label="Vị trí hàng đợi" value={`${selectedReservation.queuePosition} / ${selectedReservation.queueTotal || selectedReservation.queuePosition}`} />
+              <DetailField label="Trạng thái" value={<StatusPill status={selectedReservation.status} />} />
+              <DetailField label="Ngày tạo" value={formatDateTime(selectedReservation.requestDate)} />
+              <DetailField label="Hạn giữ chỗ" value={formatDateTime(selectedReservation.holdExpiryAt)} />
+              <DetailField label="Barcode bản sao" value={selectedReservation.copy?.barcode} />
+              <DetailField label="Vị trí kệ" value={selectedReservation.copy?.shelfLocation} />
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "seed": "ts-node --project tsconfig.json src/scripts/seed.ts",
     "seed:reset-demo": "ts-node --project tsconfig.json src/scripts/seed.ts --reset-demo",
+    "members:backfill-dates": "ts-node --project tsconfig.json src/scripts/backfillMemberDates.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint \"src/**/*.ts\"",
     "test": "jest --config ./jest.config.js --passWithNoTests --runInBand"

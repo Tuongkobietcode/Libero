@@ -28,6 +28,7 @@ import { formatDate, formatDateTime } from '../../utils/format';
 
 type RoleFilter = Role | 'all';
 type StatusFilter = MemberStatus | 'all';
+type CardStatusFilter = 'all' | 'active' | 'blocked';
 
 interface StatCardProps {
   icon: ReactNode;
@@ -117,17 +118,19 @@ export default function MemberListPage() {
   const q = searchParams.get('q') ?? '';
   const role = (searchParams.get('role') ?? 'all') as RoleFilter;
   const status = (searchParams.get('status') ?? 'all') as StatusFilter;
+  const cardStatus = (searchParams.get('cardStatus') ?? 'all') as CardStatusFilter;
   const page = Number(searchParams.get('page') ?? '1');
   const limit = Number(searchParams.get('limit') ?? '10');
   const debouncedQuery = useDebounce(q, 300);
 
   const membersQuery = useQuery({
-    queryKey: ['members', debouncedQuery, role, status, page, limit],
+    queryKey: ['members', debouncedQuery, role, status, cardStatus, page, limit],
     queryFn: () =>
       memberApi.listMembers({
         ...(debouncedQuery ? { q: debouncedQuery } : {}),
         ...(role !== 'all' ? { role } : {}),
         ...(status !== 'all' ? { status } : {}),
+        ...(cardStatus !== 'all' ? { cardStatus } : {}),
         page,
         limit,
       }),
@@ -204,6 +207,7 @@ export default function MemberListPage() {
     next.delete('q');
     next.delete('role');
     next.delete('status');
+    next.delete('cardStatus');
     next.set('page', '1');
     next.set('limit', String(limit));
     setSearchParams(next);
@@ -234,7 +238,7 @@ export default function MemberListPage() {
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
-        <div className="grid gap-4 xl:grid-cols-[minmax(260px,1fr)_220px_220px_auto] xl:items-end">
+        <div className="grid gap-4 xl:grid-cols-[minmax(260px,1fr)_220px_220px_220px_auto] xl:items-end">
           <label className="block">
             <span className="sr-only">Tìm độc giả</span>
             <span className="relative block">
@@ -283,6 +287,20 @@ export default function MemberListPage() {
             </AdminSelect>
           </label>
 
+          <label className="block">
+            <span className="mb-2 block text-xs font-bold text-slate-500">Thẻ thư viện</span>
+            <AdminSelect
+              value={cardStatus}
+              onChange={(event) => updateParam('cardStatus', event.target.value)}
+              wrapperClassName="w-full"
+              className="h-11"
+            >
+              <option value="all">Tất cả thẻ</option>
+              <option value="active">Còn hiệu lực</option>
+              <option value="blocked">Đang khóa</option>
+            </AdminSelect>
+          </label>
+
           <button
             type="button"
             onClick={resetFilters}
@@ -291,27 +309,6 @@ export default function MemberListPage() {
             <ReloadOutlined />
             Đặt lại
           </button>
-        </div>
-
-        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
-          <span className="text-sm font-semibold text-slate-500">Bộ lọc nhanh:</span>
-          {Object.values(MemberStatus).map((value) => (
-            <button
-              type="button"
-              onClick={() => updateParam('status', value)}
-              className={`inline-flex h-9 items-center gap-2 rounded-lg border px-4 text-sm font-semibold transition ${
-                status === value ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200'
-              }`}
-              key={value}
-            >
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  value === MemberStatus.Active ? 'bg-emerald-500' : value === MemberStatus.Pending ? 'bg-amber-500' : value === MemberStatus.Suspended ? 'bg-rose-500' : 'bg-orange-500'
-                }`}
-              />
-              {getStatusLabel(value)}
-            </button>
-          ))}
         </div>
       </section>
 

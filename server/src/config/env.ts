@@ -28,6 +28,8 @@ const envSchema = z.object({
   SMTP_USER: z.string().min(1),
   SMTP_PASS: z.string().min(1),
   FINE_BLOCK_THRESHOLD: z.coerce.number().int().nonnegative(),
+  OVERDUE_BLOCK_LOAN_COUNT_THRESHOLD: z.coerce.number().int().positive().default(3),
+  OVERDUE_BLOCK_DAYS_THRESHOLD: z.coerce.number().int().positive().default(30),
   HOLD_EXPIRY_HOURS: z.coerce.number().int().positive(),
   FRONTEND_URL: z.string().url(),
   CORS_ORIGINS: z

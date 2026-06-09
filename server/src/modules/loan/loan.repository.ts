@@ -1,6 +1,6 @@
 import { Types, type ClientSession, type FilterQuery } from 'mongoose';
 
-import { BookHoldStatus, FineStatus, LoanStatus, ReservationStatus } from '../../common/types/enums';
+import { BookHoldStatus, FineStatus, LoanStatus, ReservationStatus, Role } from '../../common/types/enums';
 import type { CopyStatus } from '../../common/types/enums';
 import { BookModel, type BookDocument } from '../../models/Book.model';
 import { BookCopyModel, type BookCopyDocument } from '../../models/BookCopy.model';
@@ -428,6 +428,26 @@ export class LoanRepository {
     return result[0]?.total ?? 0;
   }
 
+  async findActiveOverdueLoanDueDates(memberId: string | Types.ObjectId, session?: ClientSession): Promise<Date[]> {
+    let query = LoanRecordModel.find({
+      memberId: new Types.ObjectId(memberId.toString()),
+      status: {
+        $in: [LoanStatus.Active, LoanStatus.Overdue],
+      },
+      returnDate: null,
+      dueDate: {
+        $lt: new Date(),
+      },
+    }).select('dueDate');
+
+    if (session) {
+      query = query.session(session);
+    }
+
+    const loans = await query.exec();
+    return loans.map((loan) => loan.dueDate);
+  }
+
   async listLoans(params: ListLoansParams): Promise<{ loans: LoanRecordDocument[]; total: number }> {
     const { filter, page, limit } = params;
     const skip = (page - 1) * limit;
@@ -456,6 +476,11 @@ export class LoanRepository {
     return MemberModel.find({
       _id: { $in: memberIds },
     }).exec();
+  }
+
+  async findMemberIdsByRole(role: Role): Promise<Types.ObjectId[]> {
+    const members = await MemberModel.find({ role }).select('_id').exec();
+    return members.map((member) => member._id);
   }
 
   async findBooksByIds(bookIds: Types.ObjectId[]): Promise<BookDocument[]> {

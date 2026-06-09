@@ -1,10 +1,8 @@
 import {
   BookOutlined,
-  CalendarOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   EyeOutlined,
-  FilterOutlined,
   MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -17,12 +15,13 @@ import dayjs from 'dayjs';
 import { Link } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { Modal } from 'antd';
 
 import { AdminSelect, primaryActionButtonClass } from '../../components/AdminSurface';
 import { loanApi } from '../../services/loan.api';
 import { useNotificationsStore } from '../../store/notifications.store';
-import { LoanStatus, type LoanListItem } from '../../types/models';
-import { getStatusLabel } from '../../utils/display';
+import { LoanStatus, Role, type LoanListItem } from '../../types/models';
+import { getRoleLabel, getStatusLabel } from '../../utils/display';
 import { extractErrorMessage, formatCurrency, formatDate, formatDateTime } from '../../utils/format';
 
 const statusOptions = [
@@ -31,6 +30,13 @@ const statusOptions = [
   { value: LoanStatus.Overdue, label: 'Quá hạn' },
   { value: LoanStatus.Returned, label: 'Đã trả' },
   { value: LoanStatus.Lost, label: 'Mất sách' },
+] as const;
+
+const roleOptions = [
+  { value: '', label: 'Tất cả vai trò' },
+  { value: Role.Student, label: getRoleLabel(Role.Student) },
+  { value: Role.Lecturer, label: getRoleLabel(Role.Lecturer) },
+  { value: Role.Librarian, label: getRoleLabel(Role.Librarian) },
 ] as const;
 
 const statusTone: Record<LoanStatus, string> = {
@@ -146,11 +152,13 @@ export default function CheckoutPage() {
   const notify = useNotificationsStore((state) => state.push);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<LoanStatus | ''>('');
+  const [role, setRole] = useState<Role | ''>('');
   const [keyword, setKeyword] = useState('');
+  const [selectedLoan, setSelectedLoan] = useState<LoanListItem | null>(null);
 
   const loansQuery = useQuery({
-    queryKey: ['loans', 'manager', page, status],
-    queryFn: () => loanApi.listLoans({ page, limit: 10, status: status || undefined }),
+    queryKey: ['loans', 'manager', page, status, role],
+    queryFn: () => loanApi.listLoans({ page, limit: 10, status: status || undefined, role: role || undefined }),
   });
   const activeQuery = useQuery({
     queryKey: ['loans', 'count', LoanStatus.Active],
@@ -253,7 +261,7 @@ export default function CheckoutPage() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.04)]">
-        <div className="grid gap-4 xl:grid-cols-[1.3fr_0.7fr_0.7fr_0.7fr_auto]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(260px,1fr)_220px_220px_auto] xl:items-end">
           <label className="relative">
             <span className="sr-only">Tìm kiếm khoản mượn</span>
             <SearchOutlined className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -285,30 +293,31 @@ export default function CheckoutPage() {
           </label>
 
           <label className="grid gap-1">
-            <span className="text-xs font-bold text-slate-500">Khoảng thời gian</span>
-            <button className="flex h-12 items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700" type="button">
-              30 ngày qua
-              <CalendarOutlined />
-            </button>
-          </label>
-
-          <label className="grid gap-1">
-            <span className="text-xs font-bold text-slate-500">Loại độc giả</span>
-            <button className="flex h-12 items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700" type="button">
-              Tất cả
-            </button>
+            <span className="text-xs font-bold text-slate-500">Vai trò</span>
+            <AdminSelect
+              wrapperClassName="w-full"
+              className="h-11"
+              onChange={(event) => {
+                setPage(1);
+                setRole(event.target.value as Role | '');
+              }}
+              value={role}
+            >
+              {roleOptions.map((option) => (
+                <option key={option.value || 'all'} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </AdminSelect>
           </label>
 
           <div className="flex items-end gap-3">
-            <button className="inline-flex h-12 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button">
-              <FilterOutlined />
-              Bộ lọc khác
-            </button>
             <button
               className="inline-flex h-12 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               onClick={() => {
                 setKeyword('');
                 setStatus('');
+                setRole('');
                 setPage(1);
               }}
               type="button"
@@ -317,15 +326,6 @@ export default function CheckoutPage() {
               Đặt lại
             </button>
           </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-          <span className="font-medium text-slate-600">Bộ lọc đang chọn:</span>
-          <span className="rounded-full bg-slate-100 px-4 py-2 font-bold text-slate-700">30 ngày qua</span>
-          <span className="rounded-full bg-slate-100 px-4 py-2 font-bold text-slate-700">{status ? getStatusLabel(status) : 'Tất cả trạng thái'}</span>
-          <button className="font-semibold text-blue-600" onClick={() => setStatus('')} type="button">
-            Xóa tất cả
-          </button>
         </div>
       </section>
 
@@ -383,7 +383,7 @@ export default function CheckoutPage() {
                       <td className={`whitespace-nowrap px-5 py-4 text-right font-extrabold ${loan.unpaidFineTotal > 0 ? 'text-red-600' : 'text-slate-900'}`}>{formatCurrency(loan.unpaidFineTotal, '0 đ')}</td>
                       <td className="whitespace-nowrap px-5 py-4">
                         <div className="flex justify-center gap-2">
-                          <ActionButton icon={<EyeOutlined />} label="Xem chi tiết" />
+                          <ActionButton icon={<EyeOutlined />} label="Xem chi tiết" onClick={() => setSelectedLoan(loan)} />
                           <ActionButton disabled={!canMutate || renewMutation.isPending} icon={<RetweetOutlined />} label="Gia hạn" onClick={() => renewMutation.mutate(loan._id)} />
                           <ActionButton disabled={!canMutate || returnMutation.isPending} icon={<ReloadOutlined />} label="Trả sách" onClick={() => returnMutation.mutate(loan._id)} />
                           <ActionButton disabled={!canMutate || lostMutation.isPending} icon={<WarningOutlined />} label="Báo mất" onClick={() => lostMutation.mutate(loan._id)} />
@@ -420,6 +420,56 @@ export default function CheckoutPage() {
           </div>
         </div>
       </section>
+
+      <Modal
+        title={selectedLoan ? `Chi tiết khoản mượn ${buildLoanCode(selectedLoan, 0)}` : 'Chi tiết khoản mượn'}
+        open={Boolean(selectedLoan)}
+        onCancel={() => setSelectedLoan(null)}
+        footer={null}
+        width={820}
+      >
+        {selectedLoan ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="m-0 text-xs font-black uppercase tracking-[0.08em] text-slate-400">Độc giả</p>
+              <p className="m-0 mt-2 font-extrabold text-slate-900">{selectedLoan.member.fullName}</p>
+              <p className="m-0 mt-1 text-sm font-semibold text-slate-500">{selectedLoan.member.memberCardNo}</p>
+              <p className="m-0 mt-1 text-sm font-semibold text-slate-500">{getRoleLabel(selectedLoan.member.role)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="m-0 text-xs font-black uppercase tracking-[0.08em] text-slate-400">Sách</p>
+              <p className="m-0 mt-2 font-extrabold text-slate-900">{selectedLoan.book.title}</p>
+              <p className="m-0 mt-1 text-sm font-semibold text-slate-500">{selectedLoan.book.authors.map((author) => author.name).join(', ') || selectedLoan.book.isbn}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="m-0 text-xs font-black uppercase tracking-[0.08em] text-slate-400">Barcode</p>
+              <p className="m-0 mt-2 font-extrabold text-slate-900">{selectedLoan.copy.barcode}</p>
+              <p className="m-0 mt-1 text-sm font-semibold text-slate-500">{selectedLoan.copy.shelfLocation ?? '-'}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="m-0 text-xs font-black uppercase tracking-[0.08em] text-slate-400">Trạng thái</p>
+              <div className="mt-2">
+                <StatusPill status={selectedLoan.status} />
+              </div>
+              <p className="m-0 mt-2 text-sm font-semibold text-slate-500">Phạt hiện tại: {formatCurrency(selectedLoan.unpaidFineTotal, '0 đ')}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="m-0 text-xs font-black uppercase tracking-[0.08em] text-slate-400">Ngày mượn</p>
+              <p className="m-0 mt-2 font-extrabold text-slate-900">{formatDateTime(selectedLoan.checkoutDate)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="m-0 text-xs font-black uppercase tracking-[0.08em] text-slate-400">Hạn trả</p>
+              <p className="m-0 mt-2 font-extrabold text-slate-900">{formatDateTime(selectedLoan.dueDate)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2">
+              <p className="m-0 text-xs font-black uppercase tracking-[0.08em] text-slate-400">Chính sách khoản mượn</p>
+              <p className="m-0 mt-2 text-sm font-semibold text-slate-700">
+                Thời hạn {selectedLoan.policyLoanDays} ngày, đã gia hạn {selectedLoan.renewCount}/{selectedLoan.policyMaxRenewals} lần, mỗi lần thêm {selectedLoan.policyRenewDays} ngày.
+              </p>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

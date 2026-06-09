@@ -55,4 +55,41 @@ describe('overdueMarker job', () => {
     expect(summary.processedCount).toBe(2);
     expect(summary.updatedCount).toBe(2);
   });
+
+  it('uses Vietnam calendar date for the overdue cutoff', async () => {
+    const exec = jest.fn().mockResolvedValue({
+      matchedCount: 1,
+      modifiedCount: 1,
+    });
+    const updateMany = jest.fn().mockReturnValue({
+      exec,
+    });
+
+    jest.doMock('../../../src/models/LoanRecord.model', () => ({
+      LoanRecordModel: {
+        updateMany,
+      },
+    }));
+
+    const { LoanStatus } = await import('../../../src/common/types/enums');
+    const { runOverdueMarkerJob } = await import('../../../src/jobs/overdueMarker.job');
+
+    const summary = await runOverdueMarkerJob(new Date('2026-04-12T17:05:00.000Z'));
+
+    expect(updateMany).toHaveBeenCalledWith(
+      {
+        status: LoanStatus.Active,
+        returnDate: null,
+        dueDate: {
+          $lt: new Date('2026-04-13T00:00:00.000Z'),
+        },
+      },
+      {
+        $set: {
+          status: LoanStatus.Overdue,
+        },
+      },
+    );
+    expect(summary.updatedCount).toBe(1);
+  });
 });

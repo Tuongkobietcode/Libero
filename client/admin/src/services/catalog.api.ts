@@ -66,6 +66,16 @@ export const catalogApi = {
     const response = await apiClient.patch<ApiEnvelope<BookDetail>>(`/books/${bookId}`, payload);
     return unwrapResponse(response.data);
   },
+  async uploadCoverImage(file: File): Promise<{ coverImage: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post<ApiEnvelope<{ coverImage: string }>>('/books/cover-upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return unwrapResponse(response.data);
+  },
   async deleteBook(bookId: string): Promise<BookDetail> {
     const response = await apiClient.delete<ApiEnvelope<BookDetail>>(`/books/${bookId}`);
     return unwrapResponse(response.data);

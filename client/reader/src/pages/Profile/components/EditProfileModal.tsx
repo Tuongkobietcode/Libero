@@ -111,9 +111,6 @@ export function EditProfileModal({
           <TextField label="Mã sinh viên" value={form.studentId} onChange={setField('studentId')} />
           <TextField label="Khoa" value={form.faculty} onChange={setField('faculty')} />
           <TextField label="Lớp" value={form.className} onChange={setField('className')} />
-          <div className="md:col-span-2">
-            <TextField label="Cơ sở" value={form.campus} onChange={setField('campus')} />
-          </div>
         </div>
 
         <footer className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">

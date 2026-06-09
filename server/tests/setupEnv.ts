@@ -10,5 +10,7 @@ process.env.SMTP_PORT = process.env.SMTP_PORT ?? '587';
 process.env.SMTP_USER = process.env.SMTP_USER ?? 'smtp-user';
 process.env.SMTP_PASS = process.env.SMTP_PASS ?? 'smtp-pass';
 process.env.FINE_BLOCK_THRESHOLD = process.env.FINE_BLOCK_THRESHOLD ?? '50000';
+process.env.OVERDUE_BLOCK_LOAN_COUNT_THRESHOLD = process.env.OVERDUE_BLOCK_LOAN_COUNT_THRESHOLD ?? '3';
+process.env.OVERDUE_BLOCK_DAYS_THRESHOLD = process.env.OVERDUE_BLOCK_DAYS_THRESHOLD ?? '30';
 process.env.HOLD_EXPIRY_HOURS = process.env.HOLD_EXPIRY_HOURS ?? '48';
 process.env.FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173';

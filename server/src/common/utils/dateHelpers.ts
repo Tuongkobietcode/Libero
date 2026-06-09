@@ -12,6 +12,11 @@ export function startOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
 }
 
+export function startOfVietnamCalendarDay(date: Date): Date {
+  const vietnamDate = addHours(date, 7);
+  return new Date(Date.UTC(vietnamDate.getUTCFullYear(), vietnamDate.getUTCMonth(), vietnamDate.getUTCDate(), 0, 0, 0, 0));
+}
+
 export function endOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
 }

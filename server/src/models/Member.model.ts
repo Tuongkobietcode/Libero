@@ -19,8 +19,6 @@ export interface Member {
   expiryDate?: Date;
   faculty?: string;
   className?: string;
-  campus?: string;
-  libraryBranch?: string;
   membershipTier?: string;
   lastLoginAt?: Date | null;
   passwordUpdatedAt?: Date | null;
@@ -57,6 +55,8 @@ const memberSchema = new Schema<Member, MemberModelType, MemberMethods>(
     phone: {
       type: String,
       trim: true,
+      unique: true,
+      sparse: true,
     },
     studentId: {
       type: String,
@@ -96,23 +96,22 @@ const memberSchema = new Schema<Member, MemberModelType, MemberMethods>(
     },
     joinDate: {
       type: Date,
+      default: Date.now,
     },
     expiryDate: {
       type: Date,
+      default(this: Member) {
+        const joinDate = this.joinDate ?? new Date();
+        const expiryDate = new Date(joinDate);
+        expiryDate.setUTCDate(expiryDate.getUTCDate() + 365);
+        return expiryDate;
+      },
     },
     faculty: {
       type: String,
       trim: true,
     },
     className: {
-      type: String,
-      trim: true,
-    },
-    campus: {
-      type: String,
-      trim: true,
-    },
-    libraryBranch: {
       type: String,
       trim: true,
     },

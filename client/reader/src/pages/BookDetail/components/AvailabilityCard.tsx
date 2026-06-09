@@ -45,6 +45,8 @@ export function AvailabilityCard({
   const actionLabel = isAvailable ? 'Đặt giữ sách' : 'Đặt chỗ sách';
   const helperText = isBlocked
     ? 'Tài khoản của bạn đang bị khóa nên không thể đặt chỗ thêm. Vui lòng xử lý các nghĩa vụ còn tồn tại với thư viện.'
+    : activeHold
+      ? 'Bản sách đang được giữ cho bạn. Vui lòng đến thư viện trước thời hạn để nhận sách.'
     : isAvailable
       ? 'Đặt giữ sách tại kệ tối đa 2 ngày để bạn đến nhận mượn.'
       : 'Đặt chỗ sẽ đưa bạn vào hàng chờ và thông báo khi có bản trả.';

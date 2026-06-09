@@ -15,10 +15,11 @@ export default function MyFinesPage() {
   const { user } = useAuth();
   const notify = useNotificationsStore((state) => state.push);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [unpaidPage, setUnpaidPage] = useState(1);
 
   const unpaidFinesQuery = useQuery({
-    queryKey: ['reader-my-fines', FineStatus.Unpaid],
-    queryFn: () => fineApi.getMyFines({ status: FineStatus.Unpaid, page: 1, limit: LIST_LIMIT }),
+    queryKey: ['reader-my-fines', FineStatus.Unpaid, unpaidPage],
+    queryFn: () => fineApi.getMyFines({ status: FineStatus.Unpaid, page: unpaidPage, limit: LIST_LIMIT }),
   });
 
   const paidFinesQuery = useQuery({
@@ -73,6 +74,7 @@ export default function MyFinesPage() {
 
   const summary = unpaidFinesQuery.data?.summary ?? paidFinesQuery.data?.summary ?? waivedFinesQuery.data?.summary;
   const unpaidTotalItems = unpaidFinesQuery.data?.pagination.totalItems ?? unpaidFines.length;
+  const unpaidTotalPages = unpaidFinesQuery.data?.pagination.totalPages ?? 1;
   const paidTotalItems = paidFinesQuery.data?.pagination.totalItems ?? 0;
   const waivedTotalItems = waivedFinesQuery.data?.pagination.totalItems ?? 0;
   const historyTotalItems = paidTotalItems + waivedTotalItems;
@@ -94,7 +96,10 @@ export default function MyFinesPage() {
       <UnpaidFinesSection
         fines={unpaidFines}
         loading={unpaidFinesQuery.isLoading}
+        page={unpaidPage}
         totalItems={unpaidTotalItems}
+        totalPages={unpaidTotalPages}
+        onPageChange={setUnpaidPage}
       />
 
       <FineHistorySection

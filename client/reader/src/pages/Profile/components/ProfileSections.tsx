@@ -13,7 +13,6 @@ import {
   KeyRound,
   Library,
   Mail,
-  MapPin,
   Phone,
   ShieldCheck,
   UserRound,
@@ -160,7 +159,7 @@ export function ProfileDetailsSection({ profile, onEdit }: { profile: MemberView
     { icon: Phone, label: 'Số điện thoại', value: profile.phone || '-' },
     { icon: GraduationCap, label: 'Mã sinh viên', value: profile.studentId || '-' },
     { icon: Library, label: 'Khoa', value: profile.faculty || '-' },
-    { icon: MapPin, label: 'Cơ sở', value: profile.campus || '-' },
+    { icon: GraduationCap, label: 'Lớp', value: profile.className || '-' },
   ];
   const libraryItems: InfoItem[] = [
     { icon: CreditCard, label: 'Mã thẻ thư viện', value: profile.memberCardNo },
@@ -168,7 +167,6 @@ export function ProfileDetailsSection({ profile, onEdit }: { profile: MemberView
     { icon: ShieldCheck, label: 'Trạng thái', value: profile.isBlocked ? 'Hạn chế mượn sách' : getStatusLabel(profile.status) },
     { icon: CalendarDays, label: 'Ngày tham gia', value: formatDate(profile.joinDate) },
     { icon: CalendarDays, label: 'Ngày hết hạn', value: formatDate(profile.expiryDate) },
-    { icon: Library, label: 'Thư viện mặc định', value: profile.libraryBranch || '-' },
   ];
 
   return (
@@ -256,23 +254,40 @@ function HistoryIcon(props: { className?: string }) {
   return <Clock3 className={props.className} aria-hidden="true" />;
 }
 
-function SecurityPanel({ profile }: { profile: MemberView }) {
+function SecurityPanel({ profile, onChangePassword }: { profile: MemberView; onChangePassword: () => void }) {
   const securityItems: InfoItem[] = [
     { icon: KeyRound, label: 'Đăng nhập gần nhất', value: profile.lastLoginAt ? formatDateTime(profile.lastLoginAt) : '-' },
     { icon: ShieldCheck, label: 'Mật khẩu cập nhật', value: profile.passwordUpdatedAt ? formatDate(profile.passwordUpdatedAt) : '-' },
   ];
 
-  return <InfoPanel title="Bảo mật tài khoản" items={securityItems} />;
+  return (
+    <InfoPanel
+      title="Bảo mật tài khoản"
+      items={securityItems}
+      action={
+        <button
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-brand-200 bg-white px-4 text-sm font-bold text-brand-700 transition hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-100"
+          type="button"
+          onClick={onChangePassword}
+        >
+          <KeyRound className="h-4 w-4" aria-hidden="true" />
+          Đổi mật khẩu
+        </button>
+      }
+    />
+  );
 }
 
 export function ProfileActivitySection({
   profile,
   activities,
   loading,
+  onChangePassword,
 }: {
   profile: MemberView;
   activities: MemberActivityItem[];
   loading: boolean;
+  onChangePassword: () => void;
 }) {
   return (
     <StaggerContainer className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -280,7 +295,7 @@ export function ProfileActivitySection({
         <ActivitySection activities={activities} loading={loading} />
       </StaggerItem>
       <StaggerItem>
-        <SecurityPanel profile={profile} />
+        <SecurityPanel profile={profile} onChangePassword={onChangePassword} />
       </StaggerItem>
     </StaggerContainer>
   );

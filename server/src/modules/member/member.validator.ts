@@ -32,6 +32,7 @@ export const listMembersQuerySchema = z.object({
   q: z.string().trim().min(1).optional(),
   role: z.nativeEnum(Role).optional(),
   status: z.nativeEnum(MemberStatus).optional(),
+  cardStatus: z.enum(['active', 'blocked']).optional(),
   memberCardNo: z.string().trim().min(1).optional(),
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -48,8 +49,6 @@ export const createMemberSchema = z.object({
   expiryDate: z.coerce.date().optional(),
   faculty: optionalTrimmedString,
   className: optionalTrimmedString,
-  campus: optionalTrimmedString,
-  libraryBranch: optionalTrimmedString,
   membershipTier: optionalTrimmedString,
 });
 
@@ -64,8 +63,6 @@ export const updateMemberSchema = z
     expiryDate: z.coerce.date().optional(),
     faculty: optionalTrimmedString,
     className: optionalTrimmedString,
-    campus: optionalTrimmedString,
-    libraryBranch: optionalTrimmedString,
     membershipTier: optionalTrimmedString,
   })
   .refine((value) => Object.values(value).some((field) => field !== undefined), 'At least one field must be provided');
@@ -78,9 +75,13 @@ export const updateMyProfileSchema = z
     studentId: editableProfileString,
     faculty: editableProfileString,
     className: editableProfileString,
-    campus: editableProfileString,
   })
   .refine((value) => Object.values(value).some((field) => field !== undefined), 'At least one field must be provided');
+
+export const changeMyPasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: passwordSchema,
+});
 
 export const myActivitiesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),

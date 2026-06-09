@@ -25,7 +25,7 @@ export function FinePolicyModal({
       items={[
         'Tiền phạt được ghi nhận khi khoản mượn quá hạn, mất sách hoặc phát sinh bồi thường theo nghiệp vụ.',
         'Khoản chưa thanh toán có thể ảnh hưởng đến quyền mượn tiếp theo và trạng thái tài khoản.',
-        'Thanh toán hoặc miễn giảm hiện do thủ thư/quản trị viên xác nhận tại hệ thống backoffice.',
+        'Thanh toán hoặc miễn giảm hiện do thủ thư/quản trị viên xác nhận tại quầy ở thư viện.',
         'Sau khi xử lý, khoản phạt chuyển sang Đã thanh toán hoặc Đã miễn giảm và được lưu trong lịch sử.',
       ]}
       noticeTitle="Khi tài khoản bị khóa"

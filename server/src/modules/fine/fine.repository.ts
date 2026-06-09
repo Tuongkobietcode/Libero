@@ -1,6 +1,6 @@
 import { Types, type ClientSession, type FilterQuery } from 'mongoose';
 
-import { FineStatus } from '../../common/types/enums';
+import { FineStatus, LoanStatus } from '../../common/types/enums';
 import { BookModel, type BookDocument } from '../../models/Book.model';
 import { FineRateModel, type FineRate, type FineRateDocument } from '../../models/FineRate.model';
 import { FineRecordModel, type FineRecord, type FineRecordDocument } from '../../models/FineRecord.model';
@@ -190,6 +190,26 @@ export class FineRepository {
 
     const result = await query.exec();
     return result[0]?.total ?? 0;
+  }
+
+  async findActiveOverdueLoanDueDates(memberId: string | Types.ObjectId, session?: ClientSession): Promise<Date[]> {
+    let query = LoanRecordModel.find({
+      memberId: new Types.ObjectId(memberId.toString()),
+      status: {
+        $in: [LoanStatus.Active, LoanStatus.Overdue],
+      },
+      returnDate: null,
+      dueDate: {
+        $lt: new Date(),
+      },
+    }).select('dueDate');
+
+    if (session) {
+      query = query.session(session);
+    }
+
+    const loans = await query.exec();
+    return loans.map((loan) => loan.dueDate);
   }
 
   async updateMemberBlockedStatus(

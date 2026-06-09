@@ -30,7 +30,7 @@ export default function AdminProfilePage() {
 
       <AdminPanel
         title="Tài khoản đang đăng nhập"
-        description="Thông tin định danh, vai trò và trạng thái truy cập của tài khoản backoffice."
+        description="Thông tin định danh, vai trò và trạng thái truy cập của tài khoản quản trị."
         actions={
           profile ? (
             <button className={primaryActionButtonClass} type="button" onClick={() => navigate(`/members/${profile._id}/edit`)}>

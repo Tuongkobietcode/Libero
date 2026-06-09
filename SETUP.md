@@ -169,6 +169,8 @@ SMTP_PORT=587
 SMTP_USER=replace-me
 SMTP_PASS=replace-me
 FINE_BLOCK_THRESHOLD=50000
+OVERDUE_BLOCK_LOAN_COUNT_THRESHOLD=3
+OVERDUE_BLOCK_DAYS_THRESHOLD=30
 HOLD_EXPIRY_HOURS=48
 FRONTEND_URL=http://localhost:5173
 CORS_ORIGINS=http://localhost:5173,http://localhost:5174
@@ -187,6 +189,8 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:5174
 | `JWT_REFRESH_TTL` | Thời gian sống refresh token, tính bằng giây. |
 | `SMTP_*` | Cấu hình gửi email. Local có thể để placeholder nếu chưa test email thật. |
 | `FINE_BLOCK_THRESHOLD` | Ngưỡng tiền phạt để chặn/hạn chế tài khoản. |
+| `OVERDUE_BLOCK_LOAN_COUNT_THRESHOLD` | Số khoản mượn đang quá hạn khiến hệ thống tự khóa thẻ. Mặc định `3`. |
+| `OVERDUE_BLOCK_DAYS_THRESHOLD` | Số ngày quá hạn tối đa cho một khoản mượn trước khi tự khóa thẻ. Mặc định `30`. |
 | `HOLD_EXPIRY_HOURS` | Số giờ giữ sách trước khi yêu cầu đặt giữ hết hạn. |
 | `FRONTEND_URL` | URL frontend chính, dùng cho link hoặc CORS fallback. |
 | `CORS_ORIGINS` | Danh sách origin được gọi API, phân tách bằng dấu phẩy. |

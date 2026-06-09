@@ -1,7 +1,7 @@
 import { FineStatus, type FineListItem } from '../../types/models';
 import { formatDate, formatDateTime, formatList } from '../../utils/format';
 
-export const LIST_LIMIT = 100;
+export const LIST_LIMIT = 10;
 
 export type SummaryTone = 'red' | 'emerald' | 'blue' | 'slate';
 

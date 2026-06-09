@@ -9,6 +9,7 @@ import { Role } from '../../common/types/enums';
 import { catalogController } from './catalog.controller';
 
 const csvMimeTypes = new Set(['text/csv', 'application/vnd.ms-excel']);
+const coverMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 function isCsvFile(file: Express.Multer.File): boolean {
   return csvMimeTypes.has(file.mimetype) || file.originalname.toLowerCase().endsWith('.csv');
@@ -26,6 +27,21 @@ const upload = multer({
     }
 
     cb(new BadRequestError(ERR.COMMON_BAD_REQUEST, 400, 'Only CSV files are accepted'));
+  },
+});
+
+const coverUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (coverMimeTypes.has(file.mimetype)) {
+      cb(null, true);
+      return;
+    }
+
+    cb(new BadRequestError(ERR.COMMON_BAD_REQUEST, 400, 'Only image files are accepted'));
   },
 });
 
@@ -62,6 +78,16 @@ catalogRouter.delete('/categories/:id', authenticate, authorize(Role.Librarian, 
 catalogRouter.get('/recommendations', authenticate, (req, res, next) => {
   void catalogController.getRecommendations(req, res).catch(next);
 });
+
+catalogRouter.post(
+  '/cover-upload',
+  authenticate,
+  authorize(Role.Librarian, Role.Admin),
+  coverUpload.single('file'),
+  (req, res, next) => {
+    void catalogController.uploadCoverImage(req, res).catch(next);
+  },
+);
 
 catalogRouter.get('/:id', (req, res, next) => {
   void catalogController.getBookById(req, res).catch(next);

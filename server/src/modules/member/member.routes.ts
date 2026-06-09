@@ -26,6 +26,10 @@ memberRouter.patch('/me', (req, res, next) => {
   void memberController.updateMyProfile(req, res).catch(next);
 });
 
+memberRouter.patch('/me/password', (req, res, next) => {
+  void memberController.changeMyPassword(req, res).catch(next);
+});
+
 memberRouter.get('/', authorize(Role.Librarian, Role.Admin), (req, res, next) => {
   void memberController.listMembers(req, res).catch(next);
 });

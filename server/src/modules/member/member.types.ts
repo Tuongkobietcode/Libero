@@ -19,8 +19,6 @@ export interface CreateManagedMemberDto {
   expiryDate?: Date;
   faculty?: string;
   className?: string;
-  campus?: string;
-  libraryBranch?: string;
   membershipTier?: string;
 }
 
@@ -34,8 +32,6 @@ export interface UpdateManagedMemberDto {
   expiryDate?: Date;
   faculty?: string;
   className?: string;
-  campus?: string;
-  libraryBranch?: string;
   membershipTier?: string;
 }
 
@@ -46,13 +42,18 @@ export interface UpdateMyProfileDto {
   studentId?: string;
   faculty?: string;
   className?: string;
-  campus?: string;
+}
+
+export interface ChangeMyPasswordDto {
+  currentPassword: string;
+  newPassword: string;
 }
 
 export interface ListMembersQuery {
   q?: string;
   role?: Role;
   status?: MemberStatus;
+  cardStatus?: 'active' | 'blocked';
   memberCardNo?: string;
   page?: number;
   limit?: number;
@@ -86,8 +87,6 @@ export interface MemberView {
   expiryDate?: Date;
   faculty?: string;
   className?: string;
-  campus?: string;
-  libraryBranch?: string;
   membershipTier?: string;
   lastLoginAt?: Date | null;
   passwordUpdatedAt?: Date | null;

@@ -9,7 +9,11 @@ export interface UpdateMyProfilePayload {
   studentId?: string;
   faculty?: string;
   className?: string;
-  campus?: string;
+}
+
+export interface ChangeMyPasswordPayload {
+  currentPassword: string;
+  newPassword: string;
 }
 
 export const memberApi = {
@@ -21,6 +25,10 @@ export const memberApi = {
   },
   async updateMyProfile(payload: UpdateMyProfilePayload): Promise<MemberView> {
     const response = await apiClient.patch<ApiEnvelope<MemberView>>('/members/me', payload);
+    return unwrapResponse(response.data);
+  },
+  async changeMyPassword(payload: ChangeMyPasswordPayload): Promise<MemberView> {
+    const response = await apiClient.patch<ApiEnvelope<MemberView>>('/members/me/password', payload);
     return unwrapResponse(response.data);
   },
   async getMyStats(): Promise<MemberStatsView> {

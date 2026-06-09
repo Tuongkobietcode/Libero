@@ -216,7 +216,7 @@ function getPageHeading(pathname: string): { title: string; subtitle?: string } 
   }
 
   if (pathname.startsWith('/profile')) {
-    return { title: 'Hồ sơ quản trị', subtitle: 'Thông tin tài khoản và quyền truy cập khu vực backoffice' };
+    return { title: 'Hồ sơ quản trị', subtitle: 'Thông tin tài khoản và quyền truy cập khu vực quản trị' };
   }
 
   return { title: 'Tổng quan' };

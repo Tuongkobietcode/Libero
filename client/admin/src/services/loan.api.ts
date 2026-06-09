@@ -1,10 +1,11 @@
 import type { ApiEnvelope, PaginatedResult } from '../types/api';
-import type { LoanDetail, LoanListItem, LoanStatus } from '../types/models';
+import type { LoanDetail, LoanListItem, LoanStatus, Role } from '../types/models';
 import { apiClient, unwrapResponse } from './api';
 
 export interface LoanListParams {
   status?: LoanStatus;
   memberId?: string;
+  role?: Role;
   page?: number;
   limit?: number;
 }

@@ -303,6 +303,10 @@ export class LoanService {
       throw new BusinessRuleError(ERR.LOAN_MEMBER_SUSPENDED, 422, 'Member cannot renew loans in the current status');
     }
 
+    if (member.isBlocked) {
+      throw new BusinessRuleError(ERR.LOAN_MEMBER_BLOCKED, 422, 'Member is blocked from renewals');
+    }
+
     if (loan.status === LoanStatus.Returned || loan.status === LoanStatus.Lost) {
       throw new BusinessRuleError(ERR.COMMON_BAD_REQUEST, 422, 'Loan is no longer renewable');
     }
@@ -422,8 +426,8 @@ export class LoanService {
         lostBlockChange.isBlocked ? 'BLOCK_MEMBER' : 'UNBLOCK_MEMBER',
         'Member',
         member._id.toString(),
-        { isBlocked: lostBlockChange.wasBlocked, reason: 'fine threshold' },
-        { isBlocked: lostBlockChange.isBlocked, reason: 'fine threshold' },
+        { isBlocked: lostBlockChange.wasBlocked, reason: 'member block policy' },
+        { isBlocked: lostBlockChange.isBlocked, reason: lostBlockChange.reasons.join(', ') || 'member block policy' },
       );
       await this.enqueueMemberBlockStatusNotification(member._id.toString(), lostBlockChange);
     }
@@ -443,6 +447,17 @@ export class LoanService {
   async listLoans(query: ListLoansQuery) {
     const pagination = buildPagination(query);
     const filter = this.buildLoanFilter(query, query.memberId);
+
+    if (query.role && !query.memberId) {
+      const memberIds = await this.repository.findMemberIdsByRole(query.role);
+
+      if (memberIds.length === 0) {
+        return buildPaginationResult<LoanListItem>([], 0, pagination);
+      }
+
+      filter.memberId = { $in: memberIds };
+    }
+
     const { loans, total } = await this.repository.listLoans({
       filter,
       page: pagination.page,
@@ -599,8 +614,8 @@ export class LoanService {
         returnBlockChange.isBlocked ? 'BLOCK_MEMBER' : 'UNBLOCK_MEMBER',
         'Member',
         member._id.toString(),
-        { isBlocked: returnBlockChange.wasBlocked, reason: 'fine threshold' },
-        { isBlocked: returnBlockChange.isBlocked, reason: 'fine threshold' },
+        { isBlocked: returnBlockChange.wasBlocked, reason: 'member block policy' },
+        { isBlocked: returnBlockChange.isBlocked, reason: returnBlockChange.reasons.join(', ') || 'member block policy' },
       );
       await this.enqueueMemberBlockStatusNotification(member._id.toString(), returnBlockChange);
     }
@@ -851,7 +866,7 @@ export class LoanService {
         await notificationService.enqueueAccountBlocked(
           memberId,
           memberId,
-          'Outstanding unpaid fines exceeded the allowed threshold.',
+          'Member card was blocked because a borrowing policy threshold was exceeded.',
           blockChange.totalUnpaid,
         );
         return;

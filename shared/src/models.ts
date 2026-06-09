@@ -51,8 +51,10 @@ export interface LoginPayload {
 export interface RegisterPayload {
   fullName: string;
   email: string;
-  phone?: string;
-  studentId?: string;
+  phone: string;
+  studentId: string;
+  faculty: string;
+  className: string;
   password: string;
 }
 
@@ -87,8 +89,6 @@ export interface MemberView {
   expiryDate?: ISODateString;
   faculty?: string;
   className?: string;
-  campus?: string;
-  libraryBranch?: string;
   membershipTier?: string;
   lastLoginAt?: ISODateString | null;
   passwordUpdatedAt?: ISODateString | null;

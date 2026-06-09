@@ -14,8 +14,10 @@ export interface LoginDto {
 export interface RegisterDto {
   fullName: string;
   email: string;
-  phone?: string;
-  studentId?: string;
+  phone: string;
+  studentId: string;
+  faculty: string;
+  className: string;
   password: string;
 }
 
@@ -61,8 +63,6 @@ export interface CreateMemberInput {
   expiryDate?: Date;
   faculty?: string;
   className?: string;
-  campus?: string;
-  libraryBranch?: string;
   membershipTier?: string;
   lastLoginAt?: Date | null;
   passwordUpdatedAt?: Date | null;
@@ -86,6 +86,7 @@ export interface AuthRepository {
   findMemberById(memberId: string): Promise<MemberAuthDocument | null>;
   emailExists(email: string): Promise<boolean>;
   studentIdExists(studentId: string): Promise<boolean>;
+  phoneExists(phone: string): Promise<boolean>;
   createMember(input: CreateMemberInput, session?: ClientSession): Promise<MemberAuthDocument>;
   getNextMemberCardNo(date?: Date): Promise<string>;
   updateMemberById(memberId: string, update: UpdateQuery<Member>, session?: ClientSession): Promise<void>;

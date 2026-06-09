@@ -103,6 +103,28 @@ export interface JobRuntime {
   close(): Promise<void>;
 }
 
+export async function runOverdueFineMaintenance(now: Date = new Date()): Promise<{
+  overdueMarker: Awaited<ReturnType<typeof runOverdueMarkerJob>>;
+  fineCalculation: Awaited<ReturnType<typeof runFineCalculationJob>>;
+  durationMs: number;
+}> {
+  const startedAt = Date.now();
+  const overdueMarker = await runOverdueMarkerJob(now);
+  const fineCalculation = await runFineCalculationJob({ now });
+  const summary = {
+    overdueMarker,
+    fineCalculation,
+    durationMs: Date.now() - startedAt,
+  };
+
+  logger.info(
+    { job: 'overdue-fine-maintenance', ...summary },
+    'Overdue fine maintenance completed',
+  );
+
+  return summary;
+}
+
 export async function registerJobs(): Promise<JobRuntime> {
   for (const recurringJob of recurringJobs) {
     await jobQueues[recurringJob.queue].add(recurringJob.jobName, {}, recurringJob.options);

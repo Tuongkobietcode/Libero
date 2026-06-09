@@ -8,6 +8,7 @@ import { AuthenticationError, BusinessRuleError, ConflictError, RateLimitError }
 import { ERR } from '../../common/errors/errorCodes';
 import { logger } from '../../common/middleware/requestLogger';
 import { MemberStatus, Role } from '../../common/types/enums';
+import { addDays } from '../../common/utils/dateHelpers';
 import { invalidateMemberCache } from '../../common/utils/memberCache';
 import { env } from '../../config/env';
 import { notificationService } from '../notification/notification.service';
@@ -55,27 +56,40 @@ export class AuthService {
 
   async register(input: RegisterDto): Promise<RegisterResult> {
     const normalizedEmail = input.email.toLowerCase();
+    const normalizedStudentId = input.studentId.trim();
+    const normalizedPhone = input.phone.trim();
+    const normalizedFaculty = input.faculty.trim();
+    const normalizedClassName = input.className.trim();
 
     if (await this.repository.emailExists(normalizedEmail)) {
       throw new ConflictError(ERR.MEM_EMAIL_EXISTS, 409, 'Email already exists');
     }
 
-    if (input.studentId && (await this.repository.studentIdExists(input.studentId))) {
+    if (await this.repository.studentIdExists(normalizedStudentId)) {
       throw new ConflictError(ERR.MEM_STUDENT_ID_EXISTS, 409, 'Student ID already exists');
+    }
+
+    if (await this.repository.phoneExists(normalizedPhone)) {
+      throw new ConflictError(ERR.MEM_PHONE_EXISTS, 409, 'Phone already exists');
     }
 
     const memberCardNo = await this.repository.getNextMemberCardNo();
     const passwordHash = await bcrypt.hash(input.password, PASSWORD_BCRYPT_COST);
+    const joinDate = new Date();
 
     const member = await this.repository.createMember({
       fullName: input.fullName,
       email: normalizedEmail,
       passwordHash,
-      phone: input.phone,
-      studentId: input.studentId,
+      phone: normalizedPhone,
+      studentId: normalizedStudentId,
+      faculty: normalizedFaculty,
+      className: normalizedClassName,
       role: Role.Student,
       memberCardNo,
       status: MemberStatus.Active,
+      joinDate,
+      expiryDate: addDays(joinDate, 365),
       passwordUpdatedAt: new Date(),
     });
 
