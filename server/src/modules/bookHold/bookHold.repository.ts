@@ -202,6 +202,63 @@ export class BookHoldRepository {
       .exec();
   }
 
+  async findNotifiedReservationForMemberBookCopy(
+    memberId: string | Types.ObjectId,
+    bookId: string | Types.ObjectId,
+    copyId: string | Types.ObjectId,
+    session: ClientSession,
+  ): Promise<ReservationDocument | null> {
+    return ReservationModel.findOne({
+      memberId,
+      bookId,
+      copyId,
+      status: ReservationStatus.Notified,
+    })
+      .session(session)
+      .exec();
+  }
+
+  async settleNotifiedReservationById(
+    reservationId: string | Types.ObjectId,
+    status: ReservationStatus.Cancelled | ReservationStatus.Expired,
+    session: ClientSession,
+  ): Promise<void> {
+    await ReservationModel.updateOne(
+      {
+        _id: reservationId,
+        status: ReservationStatus.Notified,
+      },
+      {
+        $set: {
+          status,
+          copyId: null,
+          holdExpiryAt: null,
+        },
+      },
+      { session },
+    ).exec();
+  }
+
+  async decrementWaitingQueuePositions(
+    bookId: string | Types.ObjectId,
+    queuePosition: number,
+    session: ClientSession,
+  ): Promise<void> {
+    await ReservationModel.updateMany(
+      {
+        bookId,
+        status: ReservationStatus.Waiting,
+        queuePosition: { $gt: queuePosition },
+      },
+      {
+        $inc: {
+          queuePosition: -1,
+        },
+      },
+      { session },
+    ).exec();
+  }
+
   async notifyReservationById(
     reservationId: string | Types.ObjectId,
     copyId: string | Types.ObjectId,

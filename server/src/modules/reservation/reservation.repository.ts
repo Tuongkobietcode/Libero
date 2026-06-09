@@ -3,7 +3,7 @@ import type { ClientSession, FilterQuery, Types } from 'mongoose';
 import { BookHoldStatus, CopyStatus, ReservationStatus } from '../../common/types/enums';
 import { BookModel, type BookDocument } from '../../models/Book.model';
 import { BookCopyModel, type BookCopyDocument } from '../../models/BookCopy.model';
-import { BookHoldModel, type BookHoldDocument } from '../../models/BookHold.model';
+import { BookHoldModel, type BookHold, type BookHoldDocument } from '../../models/BookHold.model';
 import { MemberModel, type MemberDocument } from '../../models/Member.model';
 import { ReservationModel, type Reservation, type ReservationDocument } from '../../models/Reservation.model';
 
@@ -93,6 +93,72 @@ export class ReservationRepository {
     }
 
     return query.exec();
+  }
+
+  async findActiveBookHoldForMemberBookCopy(
+    memberId: string | Types.ObjectId,
+    bookId: string | Types.ObjectId,
+    copyId: string | Types.ObjectId,
+    session?: ClientSession,
+  ): Promise<BookHoldDocument | null> {
+    let query = BookHoldModel.findOne({
+      memberId,
+      bookId,
+      copyId,
+      status: BookHoldStatus.Active,
+    }).sort({ requestDate: -1 });
+
+    if (session) {
+      query = query.session(session);
+    }
+
+    return query.exec();
+  }
+
+  async createBookHold(input: Omit<BookHold, 'createdAt' | 'updatedAt'>, session: ClientSession): Promise<BookHoldDocument> {
+    const hold = new BookHoldModel(input);
+    await hold.save({ session });
+    return hold;
+  }
+
+  async cancelActiveBookHoldById(
+    holdId: string | Types.ObjectId,
+    cancelledAt: Date,
+    session: ClientSession,
+  ): Promise<void> {
+    await BookHoldModel.updateOne(
+      {
+        _id: holdId,
+        status: BookHoldStatus.Active,
+      },
+      {
+        $set: {
+          status: BookHoldStatus.Cancelled,
+          cancelledAt,
+        },
+      },
+      { session },
+    ).exec();
+  }
+
+  async expireActiveBookHoldById(
+    holdId: string | Types.ObjectId,
+    expiredAt: Date,
+    session: ClientSession,
+  ): Promise<void> {
+    await BookHoldModel.updateOne(
+      {
+        _id: holdId,
+        status: BookHoldStatus.Active,
+      },
+      {
+        $set: {
+          status: BookHoldStatus.Expired,
+          expiredAt,
+        },
+      },
+      { session },
+    ).exec();
   }
 
   async findLastWaitingReservationByBookId(

@@ -23,15 +23,6 @@ export async function runHoldExpiryJob(
   const service = options.service ?? reservationService;
   const holdService = options.bookHoldService ?? bookHoldService;
   const startedAt = Date.now();
-  const reservations = await ReservationModel.find({
-    status: ReservationStatus.Notified,
-    holdExpiryAt: {
-      $lte: now,
-    },
-  })
-    .select('_id')
-    .sort({ holdExpiryAt: 1, createdAt: 1 })
-    .exec();
   const bookHolds = await BookHoldModel.find({
     status: BookHoldStatus.Active,
     holdExpiryAt: {
@@ -45,19 +36,6 @@ export async function runHoldExpiryJob(
   let expiredCount = 0;
   let failedCount = 0;
 
-  for (const reservation of reservations) {
-    try {
-      await service.expireHold(reservation._id.toString());
-      expiredCount += 1;
-    } catch (error) {
-      failedCount += 1;
-      logger.error(
-        { err: error, reservationId: reservation._id.toString(), job: 'hold-expiry' },
-        'Hold expiry job failed for reservation',
-      );
-    }
-  }
-
   for (const hold of bookHolds) {
     try {
       await holdService.expireHold(hold._id.toString());
@@ -67,6 +45,29 @@ export async function runHoldExpiryJob(
       logger.error(
         { err: error, holdId: hold._id.toString(), job: 'hold-expiry' },
         'Hold expiry job failed for book hold',
+      );
+    }
+  }
+
+  const reservations = await ReservationModel.find({
+    status: ReservationStatus.Notified,
+    holdExpiryAt: {
+      $lte: now,
+    },
+  })
+    .select('_id')
+    .sort({ holdExpiryAt: 1, createdAt: 1 })
+    .exec();
+
+  for (const reservation of reservations) {
+    try {
+      await service.expireHold(reservation._id.toString());
+      expiredCount += 1;
+    } catch (error) {
+      failedCount += 1;
+      logger.error(
+        { err: error, reservationId: reservation._id.toString(), job: 'hold-expiry' },
+        'Hold expiry job failed for reservation',
       );
     }
   }

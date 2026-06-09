@@ -2,7 +2,7 @@ import mongoose, { Types, type ClientSession, type FilterQuery } from 'mongoose'
 
 import { BusinessRuleError, ForbiddenError, NotFoundError } from '../../common/errors/AppError';
 import { ERR } from '../../common/errors/errorCodes';
-import { BookHoldStatus, CopyStatus, MemberStatus, NotificationEvent, Role } from '../../common/types/enums';
+import { BookHoldStatus, CopyStatus, MemberStatus, NotificationEvent, ReservationStatus, Role } from '../../common/types/enums';
 import { writeAuditLog } from '../../common/utils/auditLogger';
 import { buildBookAuthorsMap, buildBookCategoriesMap, type BookNameRef } from '../../common/utils/bookAuthors';
 import { getRequiredMapValue, uniqueObjectIds } from '../../common/utils/collectionHelpers';
@@ -246,6 +246,26 @@ export class BookHoldService {
           throw new BusinessRuleError(ERR.HOLD_CANNOT_CANCEL, 422, 'Book hold could not be released');
         }
 
+        const linkedReservation = await this.repository.findNotifiedReservationForMemberBookCopy(
+          currentHold.memberId,
+          currentHold.bookId,
+          currentHold.copyId,
+          session,
+        );
+
+        if (linkedReservation) {
+          await this.repository.settleNotifiedReservationById(
+            linkedReservation._id,
+            nextStatus === BookHoldStatus.Cancelled ? ReservationStatus.Cancelled : ReservationStatus.Expired,
+            session,
+          );
+          await this.repository.decrementWaitingQueuePositions(
+            linkedReservation.bookId,
+            linkedReservation.queuePosition,
+            session,
+          );
+        }
+
         nextReservationId = await this.releaseCopyToReservationQueue(currentHold.bookId.toString(), currentHold.copyId.toString(), session);
       });
     } finally {
@@ -303,6 +323,21 @@ export class BookHoldService {
     if (!notifiedReservation) {
       throw new BusinessRuleError(ERR.COMMON_BAD_REQUEST, 422, 'Reservation queue could not be advanced');
     }
+
+    await this.repository.createBookHold(
+      {
+        memberId: notifiedReservation.memberId,
+        bookId: notifiedReservation.bookId,
+        copyId: notifiedReservation.copyId ?? new Types.ObjectId(copyId),
+        status: BookHoldStatus.Active,
+        requestDate: now,
+        holdExpiryAt,
+        fulfilledAt: null,
+        cancelledAt: null,
+        expiredAt: null,
+      },
+      session,
+    );
 
     return notifiedReservation._id.toString();
   }

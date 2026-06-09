@@ -1,11 +1,14 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { AuthCard } from '../../components/auth/AuthCard';
 import { RegisterForm } from './components/RegisterForm';
 
 export default function RegisterPage() {
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  function handleRegistered(message: string) {
+    navigate('/login', { replace: true, state: { registrationMessage: message } });
+  }
 
   return (
     <AuthCard
@@ -21,12 +24,7 @@ export default function RegisterPage() {
         </>
       }
     >
-      {feedback ? (
-        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold leading-6 text-emerald-800">
-          {feedback}
-        </div>
-      ) : null}
-      <RegisterForm onRegistered={setFeedback} />
+      <RegisterForm onRegistered={handleRegistered} />
     </AuthCard>
   );
 }

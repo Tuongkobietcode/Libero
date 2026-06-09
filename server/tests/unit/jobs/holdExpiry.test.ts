@@ -32,10 +32,22 @@ describe('holdExpiry job', () => {
     const service = {
       expireHold: jest.fn().mockResolvedValue(undefined),
     };
+    const bookHoldFind = jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
 
     jest.doMock('../../../src/models/Reservation.model', () => ({
       ReservationModel: {
         find,
+      },
+    }));
+    jest.doMock('../../../src/models/BookHold.model', () => ({
+      BookHoldModel: {
+        find: bookHoldFind,
       },
     }));
 
@@ -77,10 +89,22 @@ describe('holdExpiry job', () => {
         .mockRejectedValueOnce(new Error('Hold already released'))
         .mockResolvedValueOnce(undefined),
     };
+    const bookHoldFind = jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
 
     jest.doMock('../../../src/models/Reservation.model', () => ({
       ReservationModel: {
         find,
+      },
+    }));
+    jest.doMock('../../../src/models/BookHold.model', () => ({
+      BookHoldModel: {
+        find: bookHoldFind,
       },
     }));
 

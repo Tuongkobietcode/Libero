@@ -8,6 +8,7 @@ import {
 } from '../../common/errors/AppError';
 import { ERR } from '../../common/errors/errorCodes';
 import {
+  BookHoldStatus,
   CopyStatus,
   FineStatus,
   LoanStatus,
@@ -188,15 +189,13 @@ export class LoanService {
             session,
           );
 
-          const bookHold = reservation
-            ? null
-            : await this.repository.findActiveBookHoldForMemberBookCopy(
-                memberId,
-                copy.bookId,
-                copyId,
-                now,
-                session,
-              );
+          const bookHold = await this.repository.findActiveBookHoldForMemberBookCopy(
+            memberId,
+            copy.bookId,
+            copyId,
+            now,
+            session,
+          );
 
           if (!reservation && !bookHold) {
             throw new BusinessRuleError(ERR.LOAN_COPY_NOT_AVAILABLE, 422, 'Book copy is not available for checkout');
@@ -575,6 +574,21 @@ export class LoanService {
           }
 
           notifiedReservationId = notifiedReservation._id.toString();
+
+          await this.repository.createBookHold(
+            {
+              memberId: notifiedReservation.memberId,
+              bookId: notifiedReservation.bookId,
+              copyId: currentLoan.copyId,
+              status: BookHoldStatus.Active,
+              requestDate: now,
+              holdExpiryAt,
+              fulfilledAt: null,
+              cancelledAt: null,
+              expiredAt: null,
+            },
+            session,
+          );
 
           const reservedCopy = await this.repository.updateCopyStatusIfCurrent(
             currentLoan.copyId,

@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { BadRequestError, BusinessRuleError } from '../../src/common/errors/AppError';
 import { ERR } from '../../src/common/errors/errorCodes';
 import {
+  BookHoldStatus,
   CopyStatus,
   LoanStatus,
   MemberStatus,
@@ -34,7 +35,10 @@ function createRepositoryMock(): jest.Mocked<LoanRepository> {
     countActiveLoans: jest.fn(),
     hasActiveLoanForBook: jest.fn(),
     createLoanRecord: jest.fn(),
+    createBookHold: jest.fn(),
     findNotifiedReservationForMemberBook: jest.fn(),
+    findActiveBookHoldForMemberBookCopy: jest.fn(),
+    fulfillBookHoldById: jest.fn(),
     fulfillReservationById: jest.fn(),
     findLoanById: jest.fn(),
     findActiveLoanByCopyId: jest.fn(),
@@ -243,6 +247,9 @@ describe('LoanService', () => {
     const waitingReservation = {
       _id: reservationId,
       id: reservationId.toString(),
+      memberId: member._id,
+      bookId: book._id,
+      copyId: null,
       status: ReservationStatus.Waiting,
     } as any;
     const fakeSession = {
@@ -271,8 +278,10 @@ describe('LoanService', () => {
     repository.findWaitingReservationByBookId.mockResolvedValue(waitingReservation);
     repository.notifyReservationById.mockResolvedValue({
       ...waitingReservation,
+      copyId: loan.copyId,
       status: ReservationStatus.Notified,
     } as any);
+    repository.createBookHold.mockResolvedValue({} as any);
     repository.updateCopyStatusIfCurrent.mockResolvedValue({
       ...copy,
       status: CopyStatus.Reserved,
@@ -329,6 +338,15 @@ describe('LoanService', () => {
     expect((repository.createFineRecords.mock.calls[0]?.[0] as unknown[])).toHaveLength(3);
     expect(repository.findFineRatesEffectiveOnOrBefore).toHaveBeenCalledTimes(1);
     expect(repository.notifyReservationById).toHaveBeenCalledTimes(1);
+    expect(repository.createBookHold).toHaveBeenCalledWith(
+      expect.objectContaining({
+        memberId: member._id,
+        bookId: book._id,
+        copyId: loan.copyId,
+        status: BookHoldStatus.Active,
+      }),
+      expect.anything(),
+    );
     expect(repository.updateCopyStatusIfCurrent).toHaveBeenCalledWith(
       loan.copyId,
       [CopyStatus.Borrowed],

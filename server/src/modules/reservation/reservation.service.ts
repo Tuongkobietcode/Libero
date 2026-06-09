@@ -9,6 +9,7 @@ import {
 } from '../../common/errors/AppError';
 import { ERR } from '../../common/errors/errorCodes';
 import {
+  BookHoldStatus,
   CopyStatus,
   MemberStatus,
   NotificationEvent,
@@ -221,6 +222,17 @@ export class ReservationService {
         );
 
         if (heldCopyId) {
+          const linkedHold = await this.repository.findActiveBookHoldForMemberBookCopy(
+            currentReservation.memberId,
+            currentReservation.bookId,
+            heldCopyId,
+            session,
+          );
+
+          if (linkedHold) {
+            await this.repository.cancelActiveBookHoldById(linkedHold._id, new Date(), session);
+          }
+
           const notifyResult = await this.notifyNextInSession(currentReservation.bookId.toString(), heldCopyId, session);
           nextNotifiedReservationId = notifyResult.reservationId;
         }
@@ -292,6 +304,7 @@ export class ReservationService {
     }
 
     const heldCopyId = await this.resolveHeldCopyIdOrThrow(currentReservation);
+    const now = new Date();
     const session = await mongoose.startSession();
     let nextNotifiedReservationId: string | null = null;
 
@@ -308,6 +321,17 @@ export class ReservationService {
           currentReservation.queuePosition,
           session,
         );
+
+        const linkedHold = await this.repository.findActiveBookHoldForMemberBookCopy(
+          currentReservation.memberId,
+          currentReservation.bookId,
+          heldCopyId,
+          session,
+        );
+
+        if (linkedHold) {
+          await this.repository.expireActiveBookHoldById(linkedHold._id, now, session);
+        }
 
         const notifyResult = await this.notifyNextInSession(currentReservation.bookId.toString(), heldCopyId, session);
         nextNotifiedReservationId = notifyResult.reservationId;
@@ -512,6 +536,30 @@ export class ReservationService {
 
     if (!reservedCopy) {
       throw new BusinessRuleError(ERR.COMMON_BAD_REQUEST, 422, 'Book copy could not be reserved');
+    }
+
+    const existingHold = await this.repository.findActiveBookHoldForMemberBookCopy(
+      notifiedReservation.memberId,
+      notifiedReservation.bookId,
+      reservedCopy._id,
+      session,
+    );
+
+    if (!existingHold) {
+      await this.repository.createBookHold(
+        {
+          memberId: notifiedReservation.memberId,
+          bookId: notifiedReservation.bookId,
+          copyId: reservedCopy._id,
+          status: BookHoldStatus.Active,
+          requestDate: now,
+          holdExpiryAt,
+          fulfilledAt: null,
+          cancelledAt: null,
+          expiredAt: null,
+        },
+        session,
+      );
     }
 
     return { reservationId: notifiedReservation._id.toString() };

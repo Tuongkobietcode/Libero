@@ -4,7 +4,7 @@ import { BookHoldStatus, FineStatus, LoanStatus, ReservationStatus, Role } from 
 import type { CopyStatus } from '../../common/types/enums';
 import { BookModel, type BookDocument } from '../../models/Book.model';
 import { BookCopyModel, type BookCopyDocument } from '../../models/BookCopy.model';
-import { BookHoldModel, type BookHoldDocument } from '../../models/BookHold.model';
+import { BookHoldModel, type BookHold, type BookHoldDocument } from '../../models/BookHold.model';
 import { FineRateModel, type FineRateDocument } from '../../models/FineRate.model';
 import { FineRecordModel, type FineRecord, type FineRecordDocument } from '../../models/FineRecord.model';
 import { LoanPolicyModel, type LoanPolicyDocument } from '../../models/LoanPolicy.model';
@@ -154,6 +154,12 @@ export class LoanRepository {
     const loan = new LoanRecordModel(input);
     await loan.save({ session });
     return loan;
+  }
+
+  async createBookHold(input: Omit<BookHold, 'createdAt' | 'updatedAt'>, session: ClientSession): Promise<BookHoldDocument> {
+    const hold = new BookHoldModel(input);
+    await hold.save({ session });
+    return hold;
   }
 
   async findNotifiedReservationForMemberBook(
