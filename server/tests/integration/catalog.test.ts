@@ -154,6 +154,7 @@ describe('Catalog Phase 4 integration', () => {
   let MemberModel: typeof import('../../src/models/Member.model').MemberModel;
   let BookModel: typeof import('../../src/models/Book.model').BookModel;
   let BookCopyModel: typeof import('../../src/models/BookCopy.model').BookCopyModel;
+  let CategoryModel: typeof import('../../src/models/Category.model').CategoryModel;
   let RefreshTokenModel: typeof import('../../src/models/RefreshToken.model').RefreshTokenModel;
   let LoanPolicyModel: typeof import('../../src/models/LoanPolicy.model').LoanPolicyModel;
   let authRouter: typeof import('../../src/modules/member/auth.routes').authRouter;
@@ -202,6 +203,7 @@ describe('Catalog Phase 4 integration', () => {
     ({ MemberModel } = await import('../../src/models/Member.model'));
     ({ BookModel } = await import('../../src/models/Book.model'));
     ({ BookCopyModel } = await import('../../src/models/BookCopy.model'));
+    ({ CategoryModel } = await import('../../src/models/Category.model'));
     ({ RefreshTokenModel } = await import('../../src/models/RefreshToken.model'));
     ({ LoanPolicyModel } = await import('../../src/models/LoanPolicy.model'));
     ({ authRouter } = await import('../../src/modules/member/auth.routes'));
@@ -302,6 +304,12 @@ describe('Catalog Phase 4 integration', () => {
 
     const collections = mongoose?.connection?.collections ?? {};
     await Promise.all(Object.values(collections).map(async (collection) => collection.deleteMany({})));
+
+    await CategoryModel.insertMany([
+      { name: 'Fantasy' },
+      { name: 'Technology' },
+      { name: 'Category' },
+    ]);
 
     await LoanPolicyModel.updateOne(
       { role: Role.Student },

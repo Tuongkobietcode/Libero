@@ -45,7 +45,14 @@ app.use(cookieParser());
 app.use(rateLimiter);
 app.use(requestId);
 app.use(requestLogger);
-app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+app.use(
+  '/uploads',
+  express.static(path.resolve(process.cwd(), 'uploads'), {
+    setHeaders: (res) => {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  }),
+);
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/book-holds', bookHoldRouter);
 app.use('/api/v1/books', catalogRouter);

@@ -238,16 +238,22 @@ export class CatalogRepository {
     return query.exec();
   }
 
-  async findCategoryByIdentifier(identifier: string): Promise<CategoryDocument | null> {
+  async findCategoryByIdentifier(identifier: string, session?: ClientSession): Promise<CategoryDocument | null> {
     if (Types.ObjectId.isValid(identifier)) {
-      const categoryById = await CategoryModel.findById(identifier).exec();
+      let categoryByIdQuery = CategoryModel.findById(identifier);
+
+      if (session) {
+        categoryByIdQuery = categoryByIdQuery.session(session);
+      }
+
+      const categoryById = await categoryByIdQuery.exec();
 
       if (categoryById) {
         return categoryById;
       }
     }
 
-    return this.findCategoryByName(identifier);
+    return this.findCategoryByName(identifier, session);
   }
 
   async createCategory(name: string, session: ClientSession): Promise<CategoryDocument> {

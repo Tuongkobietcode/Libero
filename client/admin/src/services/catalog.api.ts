@@ -69,11 +69,7 @@ export const catalogApi = {
   async uploadCoverImage(file: File): Promise<{ coverImage: string }> {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await apiClient.post<ApiEnvelope<{ coverImage: string }>>('/books/cover-upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await apiClient.post<ApiEnvelope<{ coverImage: string }>>('/books/cover-upload', formData);
     return unwrapResponse(response.data);
   },
   async deleteBook(bookId: string): Promise<BookDetail> {

@@ -33,6 +33,11 @@ export default function BookFormPage() {
   const [form] = Form.useForm<BookFormValues>();
   const coverImage = Form.useWatch('coverImage', form);
 
+  const categoriesQuery = useQuery({
+    queryKey: ['catalog', 'categories'],
+    queryFn: catalogApi.listCategories,
+  });
+
   const bookQuery = useQuery({
     queryKey: ['catalog', 'book', id],
     enabled: Boolean(id),
@@ -63,6 +68,8 @@ export default function BookFormPage() {
       });
       void queryClient.invalidateQueries({ queryKey: ['catalog', 'books'] });
       void queryClient.invalidateQueries({ queryKey: ['catalog', 'book', book._id] });
+      void queryClient.invalidateQueries({ queryKey: ['catalog', 'categories'] });
+      void queryClient.invalidateQueries({ queryKey: ['catalog', 'facets'] });
       navigate(`/catalog/${book._id}`);
     },
   });
@@ -70,11 +77,18 @@ export default function BookFormPage() {
   const uploadCoverMutation = useMutation({
     mutationFn: (file: File) => catalogApi.uploadCoverImage(file),
     onSuccess: (result) => {
-      form.setFieldValue('coverImage', result.coverImage);
+      form.setFieldsValue({ coverImage: result.coverImage });
       notify({
         level: 'success',
         message: 'Đã tải ảnh bìa',
         description: 'Ảnh bìa sẽ được lưu cùng thông tin sách.',
+      });
+    },
+    onError: (error) => {
+      notify({
+        level: 'error',
+        message: 'Không thể tải ảnh bìa',
+        description: extractErrorMessage(error, 'Vui lòng kiểm tra định dạng và dung lượng ảnh.'),
       });
     },
   });
@@ -90,7 +104,7 @@ export default function BookFormPage() {
       isbn: book.isbn,
       title: book.title,
       authors: book.authors.map((author) => author.name),
-      categories: book.categories.map((category) => category.name),
+      categories: book.categories.map((category) => category._id),
       bookValue: book.bookValue,
       publisher: book.publisher,
       publishYear: book.publishYear,
@@ -103,6 +117,19 @@ export default function BookFormPage() {
     <AdminStack>
       {bookQuery.error ? (
         <Alert type="error" showIcon message="Không thể tải thông tin sách" description={(bookQuery.error as Error).message} />
+      ) : null}
+
+      {categoriesQuery.isError ? (
+        <Alert type="error" showIcon message="Không thể tải danh mục" description={(categoriesQuery.error as Error).message} />
+      ) : null}
+
+      {!categoriesQuery.isLoading && !categoriesQuery.isError && !categoriesQuery.data?.length ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="Chưa có danh mục"
+          description="Hãy tạo danh mục trước, sau đó quay lại gán danh mục cho sách."
+        />
       ) : null}
 
       <AdminPanel title="Thông tin biên mục" description="Cập nhật metadata sách và bản sao ban đầu theo cùng một biểu mẫu.">
@@ -123,7 +150,18 @@ export default function BookFormPage() {
               <Select mode="tags" placeholder="Nhập tên tác giả và nhấn Enter" />
             </Form.Item>
             <Form.Item label="Danh mục" name="categories" rules={[{ required: true }]}>
-              <Select mode="tags" placeholder="Nhập tên danh mục và nhấn Enter" />
+              <Select
+                mode="multiple"
+                loading={categoriesQuery.isLoading}
+                disabled={categoriesQuery.isLoading || !categoriesQuery.data?.length}
+                showSearch
+                optionFilterProp="label"
+                placeholder="Chọn danh mục đã có"
+                options={(categoriesQuery.data ?? []).map((category) => ({
+                  label: category.name,
+                  value: category._id,
+                }))}
+              />
             </Form.Item>
             <Form.Item label="Giá trị sách" name="bookValue">
               <InputNumber min={0} style={{ width: '100%' }} />

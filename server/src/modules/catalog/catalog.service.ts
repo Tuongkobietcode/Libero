@@ -17,6 +17,7 @@ import type { AuthorDocument } from '../../models/Author.model';
 import type { BookDocument } from '../../models/Book.model';
 import type { BookCopyDocument } from '../../models/BookCopy.model';
 import type { CategoryDocument } from '../../models/Category.model';
+import { reservationService } from '../reservation/reservation.service';
 import { catalogRepository, type CatalogRepository } from './catalog.repository';
 import { csvImportRowSchema, parseDelimitedNames } from './catalog.validator';
 import type {
@@ -51,6 +52,8 @@ interface ActiveLoanSummary {
   status: LoanStatus;
 }
 
+type ReservationQueueService = Pick<typeof reservationService, 'notifyNext'>;
+
 function isDuplicateKeyError(error: unknown): error is { code: 11000 } {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 11000;
 }
@@ -63,7 +66,10 @@ function toNameRef(document: NameDocument): BookNameRef {
 }
 
 export class CatalogService {
-  constructor(private readonly repository: CatalogRepository = catalogRepository) {}
+  constructor(
+    private readonly repository: CatalogRepository = catalogRepository,
+    private readonly reservationQueueService: ReservationQueueService = reservationService,
+  ) {}
 
   async createBook(input: CreateBookDto, actor?: RequestActor): Promise<BookDetail> {
     const existingBook = await this.repository.findBookByIsbn(input.isbn);
@@ -361,14 +367,34 @@ export class CatalogService {
       await session.endSession();
     }
 
+    await this.advanceWaitingReservationsForCopies(book.id, createdCopies, actor);
+
+    const refreshedCopies = await this.repository.findBookCopiesByBookId(book.id);
+    const refreshedCopyById = new Map(refreshedCopies.map((copy) => [copy.id, copy]));
+    const responseCopies = createdCopies.map((copy) => refreshedCopyById.get(copy.id) ?? copy);
+
     const result = {
       bookId: book.id,
-      copies: createdCopies.map((copy) => this.toCopyView(copy)),
+      copies: responseCopies.map((copy) => this.toCopyView(copy)),
     };
 
     this.writeAudit(actor, 'ADD_BOOK_COPIES', 'Book', book.id, undefined, result);
 
     return result;
+  }
+
+  private async advanceWaitingReservationsForCopies(
+    bookId: string,
+    copies: BookCopyDocument[],
+    actor?: RequestActor,
+  ): Promise<void> {
+    for (const copy of copies) {
+      const notifiedReservation = await this.reservationQueueService.notifyNext(bookId, copy.id, actor);
+
+      if (!notifiedReservation) {
+        return;
+      }
+    }
   }
 
   async updateCopyStatus(copyId: string, input: UpdateCopyStatusDto, actor?: RequestActor): Promise<BookCopyView> {
@@ -657,33 +683,21 @@ export class CatalogService {
     return uniqueObjectIds(ids);
   }
 
-  private async resolveCategoryIds(names: string[], session: ClientSession): Promise<Types.ObjectId[]> {
+  private async resolveCategoryIds(identifiers: string[], session: ClientSession): Promise<Types.ObjectId[]> {
     const ids: Types.ObjectId[] = [];
 
-    for (const name of names) {
-      const existingCategory = await this.repository.findCategoryByName(name, session);
+    for (const identifier of identifiers) {
+      const existingCategory = await this.repository.findCategoryByIdentifier(identifier, session);
 
-      if (existingCategory) {
-        ids.push(existingCategory._id);
-        continue;
+      if (!existingCategory) {
+        throw new BadRequestError(
+          ERR.COMMON_BAD_REQUEST,
+          400,
+          `Category does not exist: ${identifier}`,
+        );
       }
 
-      try {
-        const createdCategory = await this.repository.createCategory(name, session);
-        ids.push(createdCategory._id);
-      } catch (error) {
-        if (!isDuplicateKeyError(error)) {
-          throw error;
-        }
-
-        const duplicatedCategory = await this.repository.findCategoryByName(name, session);
-
-        if (!duplicatedCategory) {
-          throw error;
-        }
-
-        ids.push(duplicatedCategory._id);
-      }
+      ids.push(existingCategory._id);
     }
 
     return uniqueObjectIds(ids);

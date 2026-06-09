@@ -41,6 +41,12 @@ function createRepositoryMock(): jest.Mocked<CatalogRepository> {
   } as unknown as jest.Mocked<CatalogRepository>;
 }
 
+function createReservationQueueMock() {
+  return {
+    notifyNext: jest.fn(),
+  };
+}
+
 function createBookDocument(overrides: Record<string, unknown> = {}) {
   const bookId = new mongoose.Types.ObjectId();
 
@@ -113,8 +119,7 @@ describe('CatalogService', () => {
     repository.findBookByIsbn.mockResolvedValue(null);
     repository.findAuthorByName.mockResolvedValue(null);
     repository.createAuthor.mockResolvedValue(author);
-    repository.findCategoryByName.mockResolvedValue(null);
-    repository.createCategory.mockResolvedValue(category);
+    repository.findCategoryByIdentifier.mockResolvedValue(category);
     repository.createBook.mockResolvedValue(book);
     repository.insertBookCopies.mockResolvedValue(copies);
     repository.findAuthorsByIds.mockResolvedValue([author]);
@@ -135,6 +140,36 @@ describe('CatalogService', () => {
     expect(result.copies).toHaveLength(2);
     expect(repository.createBook).toHaveBeenCalledTimes(1);
     expect(repository.insertBookCopies).toHaveBeenCalledTimes(1);
+    expect(repository.createCategory).not.toHaveBeenCalled();
+  });
+
+  it('rejects createBook when category does not exist', async () => {
+    const repository = createRepositoryMock();
+    const fakeSession = {
+      withTransaction: jest.fn(async (callback: () => Promise<void>) => callback()),
+      endSession: jest.fn(),
+    };
+
+    jest.spyOn(mongoose, 'startSession').mockResolvedValue(fakeSession as any);
+
+    repository.findBookByIsbn.mockResolvedValue(null);
+    repository.findAuthorByName.mockResolvedValue(createNameDocument('Author'));
+    repository.findCategoryByIdentifier.mockResolvedValue(null);
+
+    const service = new CatalogService(repository);
+
+    await expect(
+      service.createBook({
+        isbn: '9781234567890',
+        title: 'Missing Category Book',
+        authors: ['Author'],
+        categories: ['Missing Category'],
+        quantity: 1,
+      }),
+    ).rejects.toThrow('Category does not exist: Missing Category');
+
+    expect(repository.createBook).not.toHaveBeenCalled();
+    expect(repository.createCategory).not.toHaveBeenCalled();
   });
 
   it('rejects createBook when ISBN already exists', async () => {
@@ -213,6 +248,7 @@ describe('CatalogService', () => {
 
   it('adds copies starting from the next copy index', async () => {
     const repository = createRepositoryMock();
+    const reservationQueue = createReservationQueueMock();
     const book = createBookDocument();
     const copies = [createCopyDocument(book._id, 3), createCopyDocument(book._id, 4)];
     const fakeSession = {
@@ -225,8 +261,10 @@ describe('CatalogService', () => {
     repository.findBookById.mockResolvedValue(book);
     repository.countCopiesByBookId.mockResolvedValue(2);
     repository.insertBookCopies.mockResolvedValue(copies);
+    repository.findBookCopiesByBookId.mockResolvedValue(copies);
+    reservationQueue.notifyNext.mockResolvedValue(null);
 
-    const service = new CatalogService(repository);
+    const service = new CatalogService(repository, reservationQueue);
     const result = await service.addCopies(book.id, {
       count: 2,
       shelfLocation: 'B2',
@@ -234,6 +272,44 @@ describe('CatalogService', () => {
 
     expect(result.copies).toHaveLength(2);
     expect(repository.countCopiesByBookId).toHaveBeenCalledWith(book.id, expect.anything());
+    expect(reservationQueue.notifyNext).toHaveBeenCalledTimes(1);
+    expect(reservationQueue.notifyNext).toHaveBeenCalledWith(book.id, copies[0].id, undefined);
+  });
+
+  it('advances waiting reservations for newly added copies', async () => {
+    const repository = createRepositoryMock();
+    const reservationQueue = createReservationQueueMock();
+    const book = createBookDocument();
+    const copies = [
+      createCopyDocument(book._id, 3, { status: CopyStatus.Reserved }),
+      createCopyDocument(book._id, 4),
+    ];
+    const fakeSession = {
+      withTransaction: jest.fn(async (callback: () => Promise<void>) => callback()),
+      endSession: jest.fn(),
+    };
+
+    jest.spyOn(mongoose, 'startSession').mockResolvedValue(fakeSession as any);
+
+    repository.findBookById.mockResolvedValue(book);
+    repository.countCopiesByBookId.mockResolvedValue(2);
+    repository.insertBookCopies.mockResolvedValue(copies);
+    repository.findBookCopiesByBookId.mockResolvedValue(copies);
+    reservationQueue.notifyNext
+      .mockResolvedValueOnce({ _id: new mongoose.Types.ObjectId().toString() } as any)
+      .mockResolvedValueOnce(null);
+
+    const service = new CatalogService(repository, reservationQueue);
+    const result = await service.addCopies(book.id, {
+      count: 2,
+      shelfLocation: 'B2',
+    });
+
+    expect(reservationQueue.notifyNext).toHaveBeenCalledTimes(2);
+    expect(reservationQueue.notifyNext).toHaveBeenNthCalledWith(1, book.id, copies[0].id, undefined);
+    expect(reservationQueue.notifyNext).toHaveBeenNthCalledWith(2, book.id, copies[1].id, undefined);
+    expect(result.copies[0]?.status).toBe(CopyStatus.Reserved);
+    expect(result.copies[1]?.status).toBe(CopyStatus.Available);
   });
 
   it('imports CSV rows with partial success', async () => {
