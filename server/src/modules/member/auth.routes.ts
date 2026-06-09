@@ -47,7 +47,7 @@ const loginLimiter = createAuthRateLimiter('login', 10, ERR.AUTH_TOO_MANY_ATTEMP
 const refreshLimiter = createAuthRateLimiter('refresh', 30, ERR.COMMON_RATE_LIMITED, 'Too many refresh attempts. Please try again later.');
 const registerLimiter = createAuthRateLimiter(
   'register',
-  5,
+  30,
   ERR.COMMON_RATE_LIMITED,
   'Too many registration attempts. Please try again later.',
   60 * 60 * 1000,
