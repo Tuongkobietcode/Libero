@@ -1,16 +1,12 @@
 import {
   AppstoreOutlined,
-  AuditOutlined,
-  BankOutlined,
   BellOutlined,
   BookOutlined,
-  BuildOutlined,
   CalendarOutlined,
   DashboardOutlined,
   DollarOutlined,
   DownOutlined,
   FileTextOutlined,
-  LockOutlined,
   LogoutOutlined,
   PieChartOutlined,
   SettingOutlined,
@@ -33,7 +29,6 @@ interface MenuItem {
   key: string;
   label: string;
   icon: ReactNode;
-  locked?: boolean;
 }
 
 interface MenuGroup {
@@ -48,16 +43,13 @@ const menuGroups: MenuGroup[] = [
   {
     title: 'Quản lý',
     items: [
-      { key: '/catalog', label: 'Sách', icon: <BookOutlined />, locked: true },
-      { key: '/categories', label: 'Danh mục', icon: <AppstoreOutlined />, locked: true },
-      { key: '/authors', label: 'Tác giả', icon: <UserOutlined />, locked: true },
-      { key: '/publishers', label: 'Nhà xuất bản', icon: <BankOutlined />, locked: true },
-      { key: '/members', label: 'Độc giả', icon: <TeamOutlined />, locked: true },
-      { key: '/library-cards', label: 'Thẻ thư viện', icon: <AuditOutlined />, locked: true },
+      { key: '/catalog', label: 'Sách', icon: <BookOutlined /> },
+      { key: '/categories', label: 'Danh mục', icon: <AppstoreOutlined /> },
+      { key: '/members', label: 'Độc giả', icon: <TeamOutlined /> },
       { key: '/circulation/checkout', label: 'Khoản mượn', icon: <FileTextOutlined /> },
-      { key: '/book-holds', label: 'Đặt giữ', icon: <BookOutlined />, locked: true },
-      { key: '/reservations', label: 'Đặt chỗ', icon: <CalendarOutlined />, locked: true },
-      { key: '/fines', label: 'Phạt', icon: <DollarOutlined />, locked: true },
+      { key: '/book-holds', label: 'Đặt giữ', icon: <BookOutlined /> },
+      { key: '/reservations', label: 'Đặt chỗ', icon: <CalendarOutlined /> },
+      { key: '/fines', label: 'Phạt', icon: <DollarOutlined /> },
     ],
   },
   {
@@ -73,34 +65,13 @@ const menuGroups: MenuGroup[] = [
   {
     title: 'Hệ thống',
     items: [
-      { key: '/users', label: 'Người dùng', icon: <UserOutlined />, locked: true },
-      { key: '/settings/roles', label: 'Vai trò & phân quyền', icon: <LockOutlined />, locked: true },
-      { key: '/settings/loan-policies', label: 'Chính sách mượn', icon: <SettingOutlined />, locked: true },
-      { key: '/settings/fine-rates', label: 'Mức phạt', icon: <DollarOutlined />, locked: true },
-      { key: '/system-logs', label: 'Nhật ký hệ thống', icon: <BuildOutlined />, locked: true },
+      { key: '/settings/loan-policies', label: 'Chính sách mượn', icon: <SettingOutlined /> },
+      { key: '/settings/fine-rates', label: 'Mức phạt', icon: <DollarOutlined /> },
     ],
   },
 ];
 
-const hiddenMenuKeys = new Set(['/authors', '/publishers', '/library-cards', '/settings/roles', '/users', '/system-logs']);
-const unlockedRoutes = new Set([
-  '/catalog',
-  '/categories',
-  '/members',
-  '/book-holds',
-  '/reservations',
-  '/fines',
-  '/settings/loan-policies',
-  '/settings/fine-rates',
-]);
-
-const visibleMenuGroups = menuGroups
-  .map((group) => ({
-    ...group,
-    items: group.items.filter((item) => !hiddenMenuKeys.has(item.key)),
-  }))
-  .filter((group) => group.items.length > 0);
-
+const visibleMenuGroups = menuGroups;
 function isActive(pathname: string, itemKey: string): boolean {
   if (itemKey === '/') {
     return pathname === '/';
@@ -157,10 +128,6 @@ function getPageHeading(pathname: string): { title: string; subtitle?: string } 
 
   if (pathname.startsWith('/catalog/') && pathname.endsWith('/edit')) {
     return { title: 'Chỉnh sửa sách', subtitle: 'Cập nhật thông tin biên mục của đầu sách' };
-  }
-
-  if (pathname.startsWith('/catalog/import')) {
-    return { title: 'Nhập CSV', subtitle: 'Tải hàng loạt đầu sách và kiểm tra lỗi theo từng dòng' };
   }
 
   if (pathname.startsWith('/catalog/')) {
@@ -221,25 +188,12 @@ function getPageHeading(pathname: string): { title: string; subtitle?: string } 
 
   return { title: 'Tổng quan' };
 }
-
 function SidebarItem({ item, pathname }: { item: MenuItem; pathname: string }) {
   const active = isActive(pathname, item.key);
-  const locked = item.locked && !unlockedRoutes.has(item.key);
   const className = [
     'flex min-h-11 w-full items-center gap-3 rounded-xl px-4 text-left text-[15px] font-semibold transition',
     active ? 'bg-[#eef0ff] text-[#3157ff]' : 'text-[#33415c] hover:bg-slate-50 hover:text-[#3157ff]',
-    locked ? 'cursor-not-allowed opacity-55 hover:bg-transparent hover:text-[#33415c]' : '',
   ].join(' ');
-
-  if (locked) {
-    return (
-      <button className={className} type="button" disabled title="Tạm khóa trong giai đoạn xem tổng quan">
-        <span className="grid h-5 w-5 place-items-center text-[18px]">{item.icon}</span>
-        <span className="min-w-0 flex-1 truncate">{item.label}</span>
-        <LockOutlined className="text-xs text-slate-400" />
-      </button>
-    );
-  }
 
   return (
     <NavLink className={className} to={item.key} end={item.key === '/'}>
@@ -248,7 +202,6 @@ function SidebarItem({ item, pathname }: { item: MenuItem; pathname: string }) {
     </NavLink>
   );
 }
-
 function AdminNotificationBell() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);

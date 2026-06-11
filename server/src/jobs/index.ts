@@ -2,7 +2,6 @@ import { Worker, type JobsOptions } from 'bullmq';
 
 import { logger } from '../common/middleware/requestLogger';
 import { jobQueueNames, jobQueues, queueConnection } from '../config/queue';
-import { processEmailSenderJob } from './emailSender.job';
 import { runDueReminderJob } from './dueReminder.job';
 import { runFineCalculationJob } from './fineCalculation.job';
 import { runHoldExpiryJob } from './holdExpiry.job';
@@ -154,10 +153,6 @@ export async function registerJobs(): Promise<JobRuntime> {
     new Worker(jobQueueNames.holdReminder, async () => runHoldReminderJob(), {
       connection: queueConnection,
       concurrency: 1,
-    }),
-    new Worker(jobQueueNames.emailSender, async (job) => processEmailSenderJob(job), {
-      connection: queueConnection,
-      concurrency: 3,
     }),
   ];
 

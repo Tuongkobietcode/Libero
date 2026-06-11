@@ -13,10 +13,6 @@ reservationRouter.post('/', authorize(Role.Student, Role.Lecturer), (req, res, n
   void reservationController.createReservation(req, res).catch(next);
 });
 
-reservationRouter.post('/for-member', authorize(Role.Librarian, Role.Admin), (req, res, next) => {
-  void reservationController.createReservationForMember(req, res).catch(next);
-});
-
 reservationRouter.get('/me', (req, res, next) => {
   void reservationController.getMyReservations(req, res).catch(next);
 });

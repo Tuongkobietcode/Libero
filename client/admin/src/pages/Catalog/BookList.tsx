@@ -9,7 +9,6 @@ import {
   ReloadOutlined,
   SearchOutlined,
   StopOutlined,
-  UploadOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Empty, Tooltip } from 'antd';
@@ -217,14 +216,6 @@ export default function BookListPage() {
     <div className="space-y-7">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
         <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/catalog/import')}
-            className={primaryActionButtonClass}
-          >
-            <UploadOutlined />
-            Nhập CSV
-          </button>
           <button
             type="button"
             onClick={() => navigate('/catalog/new')}

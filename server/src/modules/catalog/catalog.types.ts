@@ -59,19 +59,6 @@ export interface UpdateCategoryDto {
   name?: string;
 }
 
-export interface CsvImportRow {
-  isbn: string;
-  title: string;
-  author: string;
-  category: string;
-  quantity: number;
-  shelfLocation: string;
-  publisher?: string;
-  publishYear?: number;
-  description?: string;
-  coverImage?: string;
-}
-
 export interface BookNameRef {
   _id: string;
   name: string;
@@ -109,18 +96,6 @@ export interface BookListItem {
 
 export interface BookDetail extends BookListItem {
   copies: BookCopyView[];
-}
-
-export interface CsvImportErrorDetail {
-  row: number;
-  isbn?: string;
-  message: string;
-}
-
-export interface CsvImportResult {
-  successCount: number;
-  failedCount: number;
-  errors: CsvImportErrorDetail[];
 }
 
 export interface CategoryFacet {

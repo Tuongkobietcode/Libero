@@ -1,30 +1,15 @@
-import type { Queue } from 'bullmq';
-
 import { NotFoundError } from '../../common/errors/AppError';
 import { ERR } from '../../common/errors/errorCodes';
 import { NotificationEvent } from '../../common/types/enums';
 import { endOfUtcDay, startOfUtcDay } from '../../common/utils/dateHelpers';
 import { buildPagination, buildPaginationResult } from '../../common/utils/pagination';
-import { logger } from '../../common/middleware/requestLogger';
-import { getJobQueue } from '../../config/queue';
-import { env } from '../../config/env';
 import type { NotificationLogDocument, NotificationLogStatus } from '../../models/NotificationLog.model';
 import type { NotificationListItem } from '@libero/shared';
 import { realtimeHub } from '../../realtime/realtime';
 import {
   notificationRepository,
-  type NotificationMemberContact,
   type NotificationRepository,
 } from './notification.repository';
-
-type NotificationTemplate =
-  | 'checkout_confirmation'
-  | 'due_reminder'
-  | 'overdue_notice'
-  | 'book_available'
-  | 'hold_expiring'
-  | 'account_blocked'
-  | 'account_activated';
 
 interface CheckoutConfirmationBookContext {
   title: string;
@@ -44,67 +29,42 @@ interface OverdueNoticeBookContext {
   fineAmount: number;
 }
 
-export interface EmailJobPayload {
-  notificationLogId: string;
-  template: NotificationTemplate;
-  to: string;
-  subject: string;
-  context: Record<string, unknown>;
-  memberId: string;
-  eventType: NotificationEvent;
-  referenceId: string;
-}
-
-interface EnqueueEmailParams {
-  template: NotificationTemplate;
-  memberId: string;
-  eventType: NotificationEvent;
-  referenceId: string;
-  context: Record<string, unknown>;
-  now?: Date;
-}
-
-export interface EnqueueEmailResult {
+export interface EnqueueNotificationResult {
   skipped: boolean;
   logId: string | null;
-  jobId: string | null;
+  jobId: null;
 }
 
 const activeDedupStatuses: NotificationLogStatus[] = ['PENDING', 'SENT'];
 
-const eventSubjects: Record<NotificationEvent, string> = {
-  [NotificationEvent.DueReminder]: 'LIBERO - Books due soon',
-  [NotificationEvent.Overdue]: 'LIBERO - Overdue books notice',
-  [NotificationEvent.BookAvailable]: 'LIBERO - Reserved book available',
-  [NotificationEvent.HoldExpiring]: 'LIBERO - Reservation hold expiring',
-  [NotificationEvent.CheckoutConfirmation]: 'LIBERO - Checkout confirmation',
-  [NotificationEvent.AccountBlocked]: 'LIBERO - Account blocked',
-  [NotificationEvent.AccountActivated]: 'LIBERO - Account activated',
-  [NotificationEvent.MemberRegistered]: 'LIBERO - New reader registered',
-  [NotificationEvent.ReservationCreated]: 'LIBERO - Reservation created',
-  [NotificationEvent.ReservationRequested]: 'LIBERO - New reservation request',
-  [NotificationEvent.ReservationAdvanced]: 'LIBERO - Reservation queue advanced',
-  [NotificationEvent.ReservationCancelled]: 'LIBERO - Reservation cancelled',
-  [NotificationEvent.ReservationExpired]: 'LIBERO - Reservation expired',
-  [NotificationEvent.ReservationFulfilled]: 'LIBERO - Reservation fulfilled',
-  [NotificationEvent.BookHoldCreated]: 'LIBERO - Book hold created',
-  [NotificationEvent.BookHoldCancelled]: 'LIBERO - Book hold cancelled',
-  [NotificationEvent.BookHoldExpired]: 'LIBERO - Book hold expired',
-  [NotificationEvent.BookHoldFulfilled]: 'LIBERO - Book hold fulfilled',
-};
+const currencyFormatter = new Intl.NumberFormat('vi-VN', {
+  style: 'currency',
+  currency: 'VND',
+  maximumFractionDigits: 0,
+});
 
-function buildLoanRenewLink(): string {
-  return `${env.FRONTEND_URL.replace(/\/$/, '')}/my-loans`;
+function formatCurrency(amount: number): string {
+  return currencyFormatter.format(amount);
 }
 
-function buildReservationsLink(): string {
-  return `${env.FRONTEND_URL.replace(/\/$/, '')}/my-reservations`;
+function formatDate(value: Date): string {
+  return value.toLocaleDateString('vi-VN');
+}
+
+function formatDateTime(value: Date): string {
+  return value.toLocaleString('vi-VN');
+}
+
+function joinBookTitles(books: Array<{ title: string }>, maxItems = 3): string {
+  const titles = books.slice(0, maxItems).map((book) => `"${book.title}"`);
+  const remaining = books.length - titles.length;
+
+  return `${titles.join(', ')}${remaining > 0 ? ` và ${remaining} sách khác` : ''}`;
 }
 
 export class NotificationService {
   constructor(
     private readonly repository: NotificationRepository = notificationRepository,
-    private readonly getEmailQueue: () => Pick<Queue<EmailJobPayload>, 'add'> = () => getJobQueue('emailSender'),
   ) {}
 
   async enqueueCheckoutConfirmation(
@@ -112,15 +72,24 @@ export class NotificationService {
     loanId: string,
     loans: CheckoutConfirmationBookContext[],
     now: Date = new Date(),
-  ): Promise<EnqueueEmailResult> {
-    return this.enqueueEmail({
-      template: 'checkout_confirmation',
+  ): Promise<EnqueueNotificationResult> {
+    const nearestDueDate = loans.reduce<Date | null>((nearest, loan) => {
+      if (!nearest || loan.dueDate < nearest) {
+        return loan.dueDate;
+      }
+
+      return nearest;
+    }, null);
+
+    return this.enqueueInAppNotification({
       memberId,
       eventType: NotificationEvent.CheckoutConfirmation,
       referenceId: loanId,
-      context: {
-        loans,
-      },
+      title: 'Khoản mượn đã được tạo',
+      body: nearestDueDate
+        ? `Bạn đã mượn ${loans.length} sách. Hạn trả gần nhất là ${formatDate(nearestDueDate)}.`
+        : `Bạn đã mượn ${loans.length} sách.`,
+      link: '/my-loans',
       now,
     });
   }
@@ -130,15 +99,14 @@ export class NotificationService {
     loanId: string,
     books: DueReminderBookContext[],
     now: Date = new Date(),
-  ): Promise<EnqueueEmailResult> {
-    return this.enqueueEmail({
-      template: 'due_reminder',
+  ): Promise<EnqueueNotificationResult> {
+    return this.enqueueInAppNotification({
       memberId,
       eventType: NotificationEvent.DueReminder,
       referenceId: loanId,
-      context: {
-        books,
-      },
+      title: 'Sách sắp đến hạn trả',
+      body: `${joinBookTitles(books)} sắp đến hạn. Vui lòng trả sách hoặc liên hệ thư viện nếu cần hỗ trợ.`,
+      link: '/my-loans',
       now,
     });
   }
@@ -149,16 +117,16 @@ export class NotificationService {
     books: OverdueNoticeBookContext[],
     totalFine: number,
     now: Date = new Date(),
-  ): Promise<EnqueueEmailResult> {
-    return this.enqueueEmail({
-      template: 'overdue_notice',
+  ): Promise<EnqueueNotificationResult> {
+    const maxOverdueDays = books.reduce((max, book) => Math.max(max, book.overdueDays), 0);
+
+    return this.enqueueInAppNotification({
       memberId,
       eventType: NotificationEvent.Overdue,
       referenceId,
-      context: {
-        books,
-        totalFine,
-      },
+      title: 'Khoản mượn quá hạn',
+      body: `${joinBookTitles(books)} đã quá hạn tối đa ${maxOverdueDays} ngày. Tiền phạt hiện tại: ${formatCurrency(totalFine)}.`,
+      link: '/my-loans',
       now,
     });
   }
@@ -170,18 +138,16 @@ export class NotificationService {
     shelfLocation: string | undefined,
     holdExpiryAt: Date | null | undefined,
     now: Date = new Date(),
-  ): Promise<EnqueueEmailResult> {
-    return this.enqueueEmail({
-      template: 'book_available',
+  ): Promise<EnqueueNotificationResult> {
+    return this.enqueueInAppNotification({
       memberId,
       eventType: NotificationEvent.BookAvailable,
       referenceId: reservationId,
-      context: {
-        title,
-        shelfLocation,
-        holdExpiryAt,
-        myReservationsLink: buildReservationsLink(),
-      },
+      title: 'Sách đã đến lượt nhận',
+      body: `Sách "${title}" đã có thể nhận${shelfLocation ? ` tại ${shelfLocation}` : ''}${
+        holdExpiryAt ? `. Vui lòng đến trước ${formatDateTime(holdExpiryAt)}` : ''
+      }.`,
+      link: '/my-reservations',
       now,
     });
   }
@@ -193,17 +159,14 @@ export class NotificationService {
     holdExpiryAt: Date,
     hoursLeft: number,
     now: Date = new Date(),
-  ): Promise<EnqueueEmailResult> {
-    return this.enqueueEmail({
-      template: 'hold_expiring',
+  ): Promise<EnqueueNotificationResult> {
+    return this.enqueueInAppNotification({
       memberId,
       eventType: NotificationEvent.HoldExpiring,
       referenceId: reservationId,
-      context: {
-        title,
-        holdExpiryAt,
-        hoursLeft,
-      },
+      title: 'Đặt giữ sắp hết hạn',
+      body: `Sách "${title}" còn khoảng ${hoursLeft} giờ để nhận. Hạn cuối: ${formatDateTime(holdExpiryAt)}.`,
+      link: '/my-reservations',
       now,
     });
   }
@@ -214,17 +177,14 @@ export class NotificationService {
     reason: string,
     totalFine: number,
     now: Date = new Date(),
-  ): Promise<EnqueueEmailResult> {
-    return this.enqueueEmail({
-      template: 'account_blocked',
+  ): Promise<EnqueueNotificationResult> {
+    return this.enqueueInAppNotification({
       memberId,
       eventType: NotificationEvent.AccountBlocked,
       referenceId,
-      context: {
-        reason,
-        totalFine,
-        contactEmail: env.SMTP_USER,
-      },
+      title: 'Thẻ thư viện đã bị khóa',
+      body: `${reason}. Tiền phạt hiện tại: ${formatCurrency(totalFine)}. Vui lòng đến quầy thư viện để được hỗ trợ.`,
+      link: '/profile',
       now,
     });
   }
@@ -233,13 +193,14 @@ export class NotificationService {
     memberId: string,
     referenceId: string,
     now: Date = new Date(),
-  ): Promise<EnqueueEmailResult> {
-    return this.enqueueEmail({
-      template: 'account_activated',
+  ): Promise<EnqueueNotificationResult> {
+    return this.enqueueInAppNotification({
       memberId,
       eventType: NotificationEvent.AccountActivated,
       referenceId,
-      context: {},
+      title: 'Thẻ thư viện đã hoạt động',
+      body: 'Bạn có thể tiếp tục sử dụng các dịch vụ mượn, đặt giữ và đặt chỗ tại thư viện.',
+      link: '/profile',
       now,
     });
   }
@@ -250,7 +211,7 @@ export class NotificationService {
     bookTitle: string,
     createdByAdmin: boolean,
     now: Date = new Date(),
-  ): Promise<EnqueueEmailResult> {
+  ): Promise<EnqueueNotificationResult> {
     return this.enqueueInAppNotification({
       memberId,
       eventType: NotificationEvent.ReservationCreated,
@@ -270,7 +231,7 @@ export class NotificationService {
     memberCardNo: string,
     bookTitle: string,
     now: Date = new Date(),
-  ): Promise<EnqueueEmailResult[]> {
+  ): Promise<EnqueueNotificationResult[]> {
     const recipients = await this.repository.findBackofficeContacts();
 
     return Promise.all(
@@ -294,7 +255,7 @@ export class NotificationService {
     email: string,
     memberCardNo: string,
     now: Date = new Date(),
-  ): Promise<EnqueueEmailResult[]> {
+  ): Promise<EnqueueNotificationResult[]> {
     return this.enqueueBackofficeNotification({
       eventType: NotificationEvent.MemberRegistered,
       referenceId: memberId,
@@ -312,7 +273,7 @@ export class NotificationService {
     bookTitle: string,
     createdByBackoffice: boolean,
     now: Date = new Date(),
-  ): Promise<EnqueueEmailResult[]> {
+  ): Promise<EnqueueNotificationResult[]> {
     return this.enqueueBackofficeNotification({
       eventType: NotificationEvent.BookHoldCreated,
       referenceId: holdId,
@@ -330,7 +291,7 @@ export class NotificationService {
     memberCardNo: string,
     bookTitle: string,
     now: Date = new Date(),
-  ): Promise<EnqueueEmailResult[]> {
+  ): Promise<EnqueueNotificationResult[]> {
     const titleByEvent = {
       [NotificationEvent.BookHoldCancelled]: 'Đặt giữ đã hủy',
       [NotificationEvent.BookHoldExpired]: 'Đặt giữ đã hết hạn',
@@ -358,7 +319,7 @@ export class NotificationService {
     memberCardNo: string,
     bookTitle: string,
     now: Date = new Date(),
-  ): Promise<EnqueueEmailResult[]> {
+  ): Promise<EnqueueNotificationResult[]> {
     const titleByEvent = {
       [NotificationEvent.ReservationAdvanced]: 'Đặt chỗ đã đến lượt nhận',
       [NotificationEvent.ReservationCancelled]: 'Đặt chỗ đã hủy',
@@ -385,13 +346,15 @@ export class NotificationService {
     holdExpiryAt: Date,
     createdByBackoffice: boolean,
     now: Date = new Date(),
-  ): Promise<EnqueueEmailResult> {
+  ): Promise<EnqueueNotificationResult> {
     return this.enqueueInAppNotification({
       memberId,
       eventType: NotificationEvent.BookHoldCreated,
       referenceId: holdId,
       title: 'Đặt giữ thành công',
-      body: `${createdByBackoffice ? 'Thư viện đã giữ' : 'Bạn đã giữ'} sách "${bookTitle}"${shelfLocation ? ` tại ${shelfLocation}` : ''}. Vui lòng đến nhận trước ${holdExpiryAt.toLocaleString('vi-VN')}.`,
+      body: `${createdByBackoffice ? 'Thư viện đã giữ' : 'Bạn đã giữ'} sách "${bookTitle}"${
+        shelfLocation ? ` tại ${shelfLocation}` : ''
+      }. Vui lòng đến nhận trước ${formatDateTime(holdExpiryAt)}.`,
       link: `/books/${bookId}`,
       now,
     });
@@ -422,80 +385,6 @@ export class NotificationService {
     return { updatedCount };
   }
 
-  async enqueueEmail(params: EnqueueEmailParams): Promise<EnqueueEmailResult> {
-    const { template, memberId, eventType, referenceId, context, now = new Date() } = params;
-    const dateFrom = startOfUtcDay(now);
-    const dateTo = endOfUtcDay(now);
-    const existingLog = await this.repository.findNotificationForDay(
-      memberId,
-      eventType,
-      referenceId,
-      dateFrom,
-      dateTo,
-      activeDedupStatuses,
-    );
-
-    if (existingLog) {
-      return {
-        skipped: true,
-        logId: existingLog._id.toString(),
-        jobId: null,
-      };
-    }
-
-    const member = await this.repository.findMemberContactById(memberId);
-
-    if (!member) {
-      throw new NotFoundError(ERR.MEM_NOT_FOUND, 404, 'Member not found');
-    }
-
-    const subject = eventSubjects[eventType];
-    const payloadContext = this.buildContext(member, context);
-    const log = await this.repository.createNotificationLog({
-      memberId,
-      eventType,
-      referenceId,
-      template,
-      recipientEmail: member.email,
-      subject,
-      status: 'PENDING',
-      sentAt: now,
-      lastError: null,
-    });
-
-    try {
-      const job = await this.getEmailQueue().add(
-        'send',
-        {
-          notificationLogId: log._id.toString(),
-          template,
-          to: member.email,
-          subject,
-          context: payloadContext,
-          memberId,
-          eventType,
-          referenceId,
-        },
-        {
-          jobId: `notification:${log._id.toString()}`,
-        },
-      );
-
-      this.publishNotification(memberId, log);
-
-      return {
-        skipped: false,
-        logId: log._id.toString(),
-        jobId: job.id?.toString() ?? null,
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to enqueue email notification';
-      await this.repository.markNotificationFailed(log._id.toString(), message);
-      logger.error({ err: error, memberId, eventType, referenceId }, 'Failed to enqueue email notification');
-      throw error;
-    }
-  }
-
   private async enqueueInAppNotification(params: {
     memberId: string;
     eventType: NotificationEvent;
@@ -504,7 +393,7 @@ export class NotificationService {
     body?: string;
     link?: string;
     now?: Date;
-  }): Promise<EnqueueEmailResult> {
+  }): Promise<EnqueueNotificationResult> {
     const { memberId, eventType, referenceId, title, body, link, now = new Date() } = params;
     const dateFrom = startOfUtcDay(now);
     const dateTo = endOfUtcDay(now);
@@ -536,7 +425,6 @@ export class NotificationService {
       eventType,
       referenceId,
       template: 'in_app',
-      recipientEmail: member.email,
       subject: title,
       title,
       body,
@@ -562,7 +450,7 @@ export class NotificationService {
     body?: string;
     link?: string;
     now?: Date;
-  }): Promise<EnqueueEmailResult[]> {
+  }): Promise<EnqueueNotificationResult[]> {
     const recipients = await this.repository.findBackofficeContacts();
 
     return Promise.all(
@@ -645,17 +533,6 @@ export class NotificationService {
     }
 
     return undefined;
-  }
-
-  private buildContext(
-    member: NotificationMemberContact,
-    context: Record<string, unknown>,
-  ): Record<string, unknown> {
-    return {
-      fullName: member.fullName,
-      renewLink: buildLoanRenewLink(),
-      ...context,
-    };
   }
 }
 

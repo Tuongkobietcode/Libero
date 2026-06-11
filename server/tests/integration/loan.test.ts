@@ -184,10 +184,6 @@ describe('Loan Phase 5 integration', () => {
     process.env.JWT_SECRET = '0123456789abcdef0123456789abcdef';
     process.env.JWT_ACCESS_TTL = '900';
     process.env.JWT_REFRESH_TTL = '604800';
-    process.env.SMTP_HOST = 'smtp.example.com';
-    process.env.SMTP_PORT = '587';
-    process.env.SMTP_USER = 'smtp-user';
-    process.env.SMTP_PASS = 'smtp-pass';
     process.env.FINE_BLOCK_THRESHOLD = '50000';
     process.env.HOLD_EXPIRY_HOURS = '48';
     process.env.FRONTEND_URL = 'http://localhost:5173';
@@ -628,7 +624,7 @@ describe('Loan Phase 5 integration', () => {
     expect(fineRecords[0]?.amount).toBe(150000);
   });
 
-  it('allows suspended members to view /loans/me and librarians to query list/detail', async () => {
+  it('allows librarians to query list/detail for suspended members', async () => {
     const librarian = await createMember({
       email: 'librarian@example.com',
       password: 'Password1',
@@ -655,16 +651,7 @@ describe('Loan Phase 5 integration', () => {
       policyRenewDays: 7,
     });
 
-    const studentAccessToken = await loginAs(student.email, 'Password1');
     const librarianAccessToken = await loginAs(librarian.email, 'Password1');
-
-    const myLoansResponse = await request(app)
-      .get('/api/v1/loans/me')
-      .set('Authorization', `Bearer ${studentAccessToken}`)
-      .expect(200);
-
-    expect(myLoansResponse.body.data.items).toHaveLength(1);
-    expect(myLoansResponse.body.data.items[0].member._id).toBe(student.id);
 
     const listResponse = await request(app)
       .get(`/api/v1/loans?memberId=${student.id}`)

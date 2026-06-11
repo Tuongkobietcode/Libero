@@ -170,10 +170,6 @@ describe('Auth integration', () => {
     process.env.JWT_SECRET = '0123456789abcdef0123456789abcdef';
     process.env.JWT_ACCESS_TTL = '900';
     process.env.JWT_REFRESH_TTL = '604800';
-    process.env.SMTP_HOST = 'smtp.example.com';
-    process.env.SMTP_PORT = '587';
-    process.env.SMTP_USER = 'smtp-user';
-    process.env.SMTP_PASS = 'smtp-pass';
     process.env.FINE_BLOCK_THRESHOLD = '50000';
     process.env.HOLD_EXPIRY_HOURS = '48';
     process.env.FRONTEND_URL = 'http://localhost:5173';
@@ -471,8 +467,8 @@ describe('Auth integration', () => {
     expect(member?.expiryDate?.getTime()).toBe((member?.joinDate?.getTime() ?? 0) + 365 * 24 * 60 * 60 * 1000);
   });
 
-  it('rate limits register requests after five attempts from the same IP', async () => {
-    for (let attempt = 0; attempt < 5; attempt += 1) {
+  it('rate limits register requests after thirty attempts from the same IP', async () => {
+    for (let attempt = 0; attempt < 29; attempt += 1) {
       await request(app)
         .post('/api/v1/auth/register')
         .send({

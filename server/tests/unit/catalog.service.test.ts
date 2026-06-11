@@ -2,16 +2,11 @@ import mongoose from 'mongoose';
 
 import { BusinessRuleError, ConflictError } from '../../src/common/errors/AppError';
 import { CopyStatus } from '../../src/common/types/enums';
-import { parseCsvBuffer } from '../../src/common/utils/csvImporter';
 import { CatalogService } from '../../src/modules/catalog/catalog.service';
 import type { CatalogRepository } from '../../src/modules/catalog/catalog.repository';
 
 jest.mock('../../src/common/utils/auditLogger', () => ({
   writeAuditLog: jest.fn(),
-}));
-
-jest.mock('../../src/common/utils/csvImporter', () => ({
-  parseCsvBuffer: jest.fn(),
 }));
 
 function createRepositoryMock(): jest.Mocked<CatalogRepository> {
@@ -32,6 +27,7 @@ function createRepositoryMock(): jest.Mocked<CatalogRepository> {
     hasWaitingReservations: jest.fn(),
     findActiveLoanSummariesByCopyIds: jest.fn(),
     findAuthorsByIds: jest.fn(),
+    findAuthorIdsBySearch: jest.fn(),
     findCategoriesByIds: jest.fn(),
     findAuthorByName: jest.fn(),
     createAuthor: jest.fn(),
@@ -200,6 +196,7 @@ describe('CatalogService', () => {
     });
 
     repository.findAvailableBookIds.mockResolvedValue([book._id]);
+    repository.findAuthorIdsBySearch.mockResolvedValue([author._id]);
     repository.listBooks.mockResolvedValue({
       books: [book],
       total: 1,
@@ -225,6 +222,35 @@ describe('CatalogService', () => {
     expect(result.items).toHaveLength(1);
     expect(result.items[0]?.availableCopies).toBe(1);
     expect(result.items[0]?.title).toBe('Harry Potter');
+    expect(repository.findAuthorIdsBySearch).toHaveBeenCalledWith('harry');
+    expect(repository.listBooks).toHaveBeenCalledWith(expect.objectContaining({
+      filter: expect.objectContaining({
+        $or: expect.arrayContaining([
+          expect.objectContaining({ authorIds: { $in: [author._id] } }),
+        ]),
+      }),
+    }));
+  });
+
+  it('notifies the next reservation when a copy returns to available', async () => {
+    const repository = createRepositoryMock();
+    const reservationQueue = createReservationQueueMock();
+    const book = createBookDocument();
+    const damagedCopy = createCopyDocument(book._id, 1, { status: CopyStatus.Damaged });
+    const availableCopy = { ...damagedCopy, status: CopyStatus.Available };
+    const reservedCopy = { ...damagedCopy, status: CopyStatus.Reserved };
+
+    repository.findBookCopyById
+      .mockResolvedValueOnce(damagedCopy)
+      .mockResolvedValueOnce(reservedCopy);
+    repository.updateBookCopyById.mockResolvedValue(availableCopy);
+    reservationQueue.notifyNext.mockResolvedValue({ _id: new mongoose.Types.ObjectId().toString() } as any);
+
+    const service = new CatalogService(repository, reservationQueue);
+    const result = await service.updateCopyStatus(damagedCopy.id, { status: CopyStatus.Available });
+
+    expect(reservationQueue.notifyNext).toHaveBeenCalledWith(book.id, damagedCopy.id, undefined);
+    expect(result.status).toBe(CopyStatus.Reserved);
   });
 
   it('blocks soft delete when borrowed copies exist', async () => {
@@ -312,54 +338,4 @@ describe('CatalogService', () => {
     expect(result.copies[1]?.status).toBe(CopyStatus.Available);
   });
 
-  it('imports CSV rows with partial success', async () => {
-    const repository = createRepositoryMock();
-    const service = new CatalogService(repository);
-
-    jest.mocked(parseCsvBuffer).mockResolvedValue([
-      {
-        isbn: '9781234567890',
-        title: 'Valid Book',
-        author: 'Author A',
-        category: 'Category A',
-        quantity: '2',
-        shelfLocation: 'A1',
-      },
-      {
-        isbn: '9781234567890',
-        title: 'Duplicate In File',
-        author: 'Author B',
-        category: 'Category B',
-        quantity: '1',
-        shelfLocation: 'A2',
-      },
-      {
-        isbn: 'invalid',
-        title: '',
-        author: 'Author C',
-        category: 'Category C',
-        quantity: '0',
-        shelfLocation: '',
-      },
-    ] as any);
-
-    jest.spyOn(service, 'createBook').mockResolvedValue({
-      _id: new mongoose.Types.ObjectId().toString(),
-      isbn: '9781234567890',
-      title: 'Valid Book',
-      authors: [],
-      categories: [],
-      totalCopies: 2,
-      availableCopies: 2,
-      copies: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    const result = await service.importCsv(Buffer.from('isbn,title\n'));
-
-    expect(result.successCount).toBe(1);
-    expect(result.failedCount).toBe(2);
-    expect(result.errors).toHaveLength(2);
-  });
 });

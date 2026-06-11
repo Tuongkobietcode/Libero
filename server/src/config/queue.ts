@@ -35,7 +35,6 @@ export const jobQueueNames = {
   dueReminder: 'due-reminder',
   overdueReminder: 'overdue-reminder',
   holdReminder: 'hold-reminder',
-  emailSender: 'email-sender',
 } as const;
 
 type JobQueueKey = keyof typeof jobQueueNames;
@@ -80,9 +79,6 @@ export const jobQueues = {
   },
   get holdReminder() {
     return getJobQueue('holdReminder');
-  },
-  get emailSender() {
-    return getJobQueue('emailSender');
   },
 };
 

@@ -1,5 +1,5 @@
 import type { ApiEnvelope, PaginatedResult } from '../types/api';
-import type { BookDetail, BookListItem, CatalogFacets, CategoryListItem, CopyStatus, CsvImportResult } from '../types/models';
+import type { BookDetail, BookListItem, CatalogFacets, CategoryListItem, CopyStatus } from '../types/models';
 import { apiClient, unwrapResponse } from './api';
 
 export interface BookListParams {
@@ -82,16 +82,6 @@ export const catalogApi = {
   },
   async updateCopyStatus(copyId: string, status: CopyStatus): Promise<BookDetail> {
     const response = await apiClient.patch<ApiEnvelope<BookDetail>>(`/books/copies/${copyId}`, { status });
-    return unwrapResponse(response.data);
-  },
-  async importBooks(file: File): Promise<CsvImportResult> {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await apiClient.post<ApiEnvelope<CsvImportResult>>('/books/import', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
     return unwrapResponse(response.data);
   },
 };

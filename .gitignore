@@ -1,6 +1,10 @@
 node_modules/
 dist/
 coverage/
+output/
+image/
+server/tests/.cache/
+server/uploads/
 .env
 .env.local
 server/.env

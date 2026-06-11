@@ -2,26 +2,21 @@ import {
   BellOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-  EllipsisOutlined,
   HourglassOutlined,
-  PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
 } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Empty, Modal, Popconfirm, Tooltip } from 'antd';
-import { useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import { Alert, Empty, Modal, Popconfirm } from 'antd';
+import { useMemo, useState, type ReactNode } from 'react';
 
-import { AdminSelect, primaryActionButtonClass } from '../../components/AdminSurface';
-import { catalogApi } from '../../services/catalog.api';
+import { AdminSelect } from '../../components/AdminSurface';
 import { memberApi } from '../../services/member.api';
 import { reservationApi } from '../../services/reservation.api';
 import { useNotificationsStore } from '../../store/notifications.store';
-import type { BookListItem, MemberView, ReservationListItem } from '../../types/models';
-import { ReservationStatus, Role } from '../../types/models';
+import { ReservationStatus, type ReservationListItem } from '../../types/models';
 import { getStatusLabel } from '../../utils/display';
-import { extractErrorMessage, formatDate, formatDateTime, formatList } from '../../utils/format';
+import { formatDate, formatDateTime, formatList } from '../../utils/format';
 
 type ReservationStatusFilter = ReservationStatus | 'all';
 
@@ -64,7 +59,9 @@ function StatCard({ icon, label, value, tone, helper }: StatCardProps) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
       <div className="flex items-center gap-5">
-        <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-full text-2xl ring-8 ${statToneClassMap[tone]}`}>{icon}</span>
+        <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-full text-2xl ring-8 ${statToneClassMap[tone]}`}>
+          {icon}
+        </span>
         <div>
           <p className="m-0 text-sm font-semibold text-slate-500">{label}</p>
           <p className="m-0 mt-1 text-3xl font-extrabold tracking-tight text-slate-950">{formatNumber(value)}</p>
@@ -76,7 +73,11 @@ function StatCard({ icon, label, value, tone, helper }: StatCardProps) {
 }
 
 function StatusPill({ status }: { status: ReservationStatus }) {
-  return <span className={`inline-flex rounded-lg px-3 py-1 text-xs font-extrabold ${reservationStatusClassMap[status]}`}>{getStatusLabel(status)}</span>;
+  return (
+    <span className={`inline-flex rounded-lg px-3 py-1 text-xs font-extrabold ${reservationStatusClassMap[status]}`}>
+      {getStatusLabel(status)}
+    </span>
+  );
 }
 
 function DetailField({ label, value }: { label: string; value?: ReactNode }) {
@@ -119,11 +120,6 @@ export default function ReservationListPage() {
   const [status, setStatus] = useState<ReservationStatusFilter>('all');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [createMemberSearch, setCreateMemberSearch] = useState('');
-  const [createBookSearch, setCreateBookSearch] = useState('');
-  const [reservationMember, setReservationMember] = useState<MemberView | null>(null);
-  const [reservationBook, setReservationBook] = useState<BookListItem | null>(null);
   const [selectedReservation, setSelectedReservation] = useState<ReservationListItem | null>(null);
 
   const reservationsQuery = useQuery({
@@ -157,18 +153,6 @@ export default function ReservationListPage() {
     queryFn: () => reservationApi.listReservations({ memberId: selectedMemberId, status: ReservationStatus.Fulfilled, page: 1, limit: 1 }),
   });
 
-  const createMembersQuery = useQuery({
-    enabled: createModalOpen,
-    queryKey: ['reservations', 'create', 'members', createMemberSearch],
-    queryFn: () => memberApi.listMembers({ q: createMemberSearch || undefined, page: 1, limit: 6 }),
-  });
-
-  const createBooksQuery = useQuery({
-    enabled: createModalOpen,
-    queryKey: ['reservations', 'create', 'books', createBookSearch],
-    queryFn: () => catalogApi.listBooks({ q: createBookSearch || undefined, available: false, page: 1, limit: 6 }),
-  });
-
   const searchMemberMutation = useMutation({
     mutationFn: async (keyword: string) => {
       if (!keyword) {
@@ -199,50 +183,12 @@ export default function ReservationListPage() {
     },
   });
 
-  const createReservationMutation = useMutation({
-    mutationFn: () => {
-      if (!reservationMember || !reservationBook) {
-        throw new Error('Vui lòng chọn độc giả và sách cần đặt chỗ.');
-      }
-
-      return reservationApi.createReservationForMember({
-        memberId: reservationMember._id,
-        bookId: reservationBook._id,
-      });
-    },
-    onSuccess: (reservation) => {
-      notify({
-        level: 'success',
-        message: 'Đã tạo đặt chỗ',
-        description: `${reservation.member.fullName} đã được đặt chỗ sách ${reservation.book.title}.`,
-      });
-      setCreateModalOpen(false);
-      setCreateMemberSearch('');
-      setCreateBookSearch('');
-      setReservationMember(null);
-      setReservationBook(null);
-      void queryClient.invalidateQueries({ queryKey: ['reservations'] });
-    },
-    onError: (error) => {
-      notify({
-        level: 'error',
-        message: 'Không thể tạo đặt chỗ',
-        description: extractErrorMessage(error),
-      });
-    },
-  });
-
   const pagination = reservationsQuery.data?.pagination;
   const totalPages = pagination?.totalPages ?? 1;
   const items = reservationsQuery.data?.items ?? [];
   const startItem = pagination && pagination.totalItems > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0;
   const endItem = pagination ? Math.min(pagination.page * pagination.limit, pagination.totalItems) : 0;
   const visiblePages = useMemo(() => getVisiblePages(page, totalPages), [page, totalPages]);
-  const reservationMemberOptions = useMemo(
-    () => (createMembersQuery.data?.items ?? []).filter((member) => member.role === Role.Student || member.role === Role.Lecturer),
-    [createMembersQuery.data?.items],
-  );
-  const reservationBookOptions = createBooksQuery.data?.items ?? [];
 
   const resetFilters = () => {
     setSearch('');
@@ -254,105 +200,9 @@ export default function ReservationListPage() {
 
   return (
     <div className="space-y-7">
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => setCreateModalOpen(true)}
-          className={primaryActionButtonClass}
-        >
-          <PlusOutlined />
-          Tạo đặt chỗ
-        </button>
-      </div>
-
-      <Modal
-        title="Tạo đặt chỗ cho độc giả"
-        open={createModalOpen}
-        onCancel={() => setCreateModalOpen(false)}
-        onOk={() => createReservationMutation.mutate()}
-        okText="Xác nhận đặt chỗ"
-        cancelText="Đóng"
-        confirmLoading={createReservationMutation.isPending}
-        okButtonProps={{ disabled: !reservationMember || !reservationBook }}
-        width={760}
-      >
-        <div className="grid gap-5 pt-2">
-          <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <label className="block">
-              <span className="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-500">Độc giả</span>
-              <input
-                value={createMemberSearch}
-                onChange={(event) => {
-                  setCreateMemberSearch(event.target.value);
-                  setReservationMember(null);
-                }}
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-[#3157ff] focus:ring-4 focus:ring-blue-100"
-                placeholder="Tìm theo tên, email hoặc mã thẻ..."
-                type="search"
-              />
-            </label>
-            <div className="mt-3 grid gap-2">
-              {reservationMemberOptions.map((member) => (
-                <button
-                  type="button"
-                  key={member._id}
-                  onClick={() => setReservationMember(member)}
-                  className={`rounded-xl border px-3 py-2 text-left transition ${
-                    reservationMember?._id === member._id ? 'border-[#3157ff] bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/60'
-                  }`}
-                >
-                  <span className="block text-sm font-extrabold text-slate-900">{member.fullName}</span>
-                  <span className="mt-1 block text-xs font-semibold text-slate-500">{member.memberCardNo} - {member.email}</span>
-                </button>
-              ))}
-              {!reservationMemberOptions.length && !createMembersQuery.isLoading ? (
-                <p className="m-0 rounded-xl bg-white px-3 py-4 text-sm font-semibold text-slate-500">Không tìm thấy độc giả phù hợp.</p>
-              ) : null}
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <label className="block">
-              <span className="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-500">Sách cần đặt chỗ</span>
-              <input
-                value={createBookSearch}
-                onChange={(event) => {
-                  setCreateBookSearch(event.target.value);
-                  setReservationBook(null);
-                }}
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-[#3157ff] focus:ring-4 focus:ring-blue-100"
-                placeholder="Tìm theo tên sách, tác giả hoặc ISBN..."
-                type="search"
-              />
-            </label>
-            <p className="m-0 mt-2 text-xs font-semibold text-slate-500">Chỉ hiển thị sách đang hết bản sao có sẵn để đúng quy tắc đặt chỗ.</p>
-            <div className="mt-3 grid gap-2">
-              {reservationBookOptions.map((book) => (
-                <button
-                  type="button"
-                  key={book._id}
-                  onClick={() => setReservationBook(book)}
-                  className={`rounded-xl border px-3 py-2 text-left transition ${
-                    reservationBook?._id === book._id ? 'border-[#3157ff] bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/60'
-                  }`}
-                >
-                  <span className="block text-sm font-extrabold text-slate-900">{book.title}</span>
-                  <span className="mt-1 block text-xs font-semibold text-slate-500">
-                    {formatList(book.authors)} - Còn {book.availableCopies}/{book.totalCopies} bản
-                  </span>
-                </button>
-              ))}
-              {!reservationBookOptions.length && !createBooksQuery.isLoading ? (
-                <p className="m-0 rounded-xl bg-white px-3 py-4 text-sm font-semibold text-slate-500">Không có sách hết bản sao phù hợp.</p>
-              ) : null}
-            </div>
-          </section>
-        </div>
-      </Modal>
-
       <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
-        <StatCard icon={<HourglassOutlined />} label="Đang chờ" value={waitingCountQuery.data?.pagination.totalItems} tone="blue" helper="Theo API trạng thái" />
-        <StatCard icon={<BellOutlined />} label="Đã thông báo" value={notifiedCountQuery.data?.pagination.totalItems} tone="emerald" helper="Đã có bản giữ chỗ" />
+        <StatCard icon={<HourglassOutlined />} label="Đang chờ" value={waitingCountQuery.data?.pagination.totalItems} tone="blue" helper="Đang ở hàng chờ" />
+        <StatCard icon={<BellOutlined />} label="Đã thông báo" value={notifiedCountQuery.data?.pagination.totalItems} tone="emerald" helper="Đã đến lượt nhận" />
         <StatCard icon={<ClockCircleOutlined />} label="Hết hạn giữ chỗ" value={expiredCountQuery.data?.pagination.totalItems} tone="orange" helper="Cần rà soát" />
         <StatCard icon={<CheckCircleOutlined />} label="Đã hoàn tất" value={fulfilledCountQuery.data?.pagination.totalItems} tone="indigo" helper="Đã xử lý xong" />
       </div>
@@ -431,7 +281,7 @@ export default function ReservationListPage() {
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
         <div className="overflow-x-auto">
-          <table className="min-w-[1460px] w-full border-collapse text-left">
+          <table className="min-w-[1360px] w-full border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 text-xs font-extrabold text-slate-600">
                 <th className="whitespace-nowrap px-5 py-5">Mã đặt chỗ</th>
@@ -490,9 +340,6 @@ export default function ReservationListPage() {
                         >
                           Xem chi tiết
                         </button>
-                        {reservation.status === ReservationStatus.Notified ? (
-                          <span className="grid h-9 place-items-center rounded-lg bg-emerald-50 px-4 text-sm font-semibold text-emerald-600">Thông báo nhận sách</span>
-                        ) : null}
                         {[ReservationStatus.Waiting, ReservationStatus.Notified, ReservationStatus.Expired].includes(reservation.status) ? (
                           <Popconfirm
                             title="Hủy đặt chỗ này?"
@@ -508,11 +355,6 @@ export default function ReservationListPage() {
                         ) : (
                           <span className="grid h-9 min-w-16 place-items-center text-slate-400">-</span>
                         )}
-                        <Tooltip title="Tác vụ khác">
-                          <button className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600" type="button">
-                            <EllipsisOutlined />
-                          </button>
-                        </Tooltip>
                       </div>
                     </td>
                   </tr>
@@ -549,9 +391,7 @@ export default function ReservationListPage() {
                   </option>
                 ))}
               </AdminSelect>
-              <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-600 disabled:opacity-45">
-                ‹
-              </button>
+              <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-600 disabled:opacity-45">‹</button>
               {visiblePages.map((pageItem, index) =>
                 pageItem === 'ellipsis' ? (
                   <span className="grid h-11 w-8 place-items-center text-sm font-semibold text-slate-500" key={`ellipsis-${index}`}>
@@ -570,9 +410,7 @@ export default function ReservationListPage() {
                   </button>
                 ),
               )}
-              <button type="button" disabled={page >= totalPages} onClick={() => setPage(page + 1)} className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-600 disabled:opacity-45">
-                ›
-              </button>
+              <button type="button" disabled={page >= totalPages} onClick={() => setPage(page + 1)} className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-600 disabled:opacity-45">›</button>
             </div>
           </div>
         ) : null}

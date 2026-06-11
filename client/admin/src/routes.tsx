@@ -10,7 +10,6 @@ import BookDetailPage from './pages/Catalog/BookDetail';
 import BookFormPage from './pages/Catalog/BookForm';
 import BookListPage from './pages/Catalog/BookList';
 import CategoryListPage from './pages/Catalog/CategoryList';
-import CSVImportPage from './pages/Catalog/CSVImport';
 import CheckoutPage from './pages/Circulation/Checkout';
 import CreateCheckoutPage from './pages/Circulation/CreateCheckout';
 import ReturnPage from './pages/Circulation/Return';
@@ -115,7 +114,6 @@ export const router = createBrowserRouter(
         { path: 'catalog', element: <BookListPage /> },
         { path: 'categories', element: <CategoryListPage /> },
         { path: 'catalog/new', element: <BookFormPage /> },
-        { path: 'catalog/import', element: <CSVImportPage /> },
         { path: 'catalog/:id', element: <BookDetailPage /> },
         { path: 'catalog/:id/edit', element: <BookFormPage /> },
         { path: 'members', element: <MemberListPage /> },

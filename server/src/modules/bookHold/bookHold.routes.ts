@@ -13,10 +13,6 @@ bookHoldRouter.post('/', authorize(Role.Student, Role.Lecturer), (req, res, next
   void bookHoldController.createHold(req, res).catch(next);
 });
 
-bookHoldRouter.post('/for-member', authorize(Role.Librarian, Role.Admin), (req, res, next) => {
-  void bookHoldController.createHoldForMember(req, res).catch(next);
-});
-
 bookHoldRouter.get('/me', (req, res, next) => {
   void bookHoldController.getMyHolds(req, res).catch(next);
 });

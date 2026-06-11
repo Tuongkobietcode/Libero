@@ -3,7 +3,6 @@ import type { Request, Response } from 'express';
 import type { Role } from '../../common/types/enums';
 import { reservationService } from './reservation.service';
 import {
-  createReservationForMemberSchema,
   createReservationSchema,
   listReservationsQuerySchema,
   myReservationsQuerySchema,
@@ -23,16 +22,6 @@ export class ReservationController {
   async createReservation(req: Request, res: Response): Promise<void> {
     const input = createReservationSchema.parse(req.body);
     const result = await reservationService.createReservation(req.user?._id ?? '', input, buildActor(req));
-
-    res.status(201).json({
-      success: true,
-      data: result,
-    });
-  }
-
-  async createReservationForMember(req: Request, res: Response): Promise<void> {
-    const input = createReservationForMemberSchema.parse(req.body);
-    const result = await reservationService.createReservation(input.memberId, { bookId: input.bookId }, buildActor(req));
 
     res.status(201).json({
       success: true,

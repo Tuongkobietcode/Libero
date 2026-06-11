@@ -72,10 +72,6 @@ export class CatalogRepository {
     const skip = (page - 1) * limit;
     let query = BookModel.find(filter).sort(q ? { createdAt: -1 } : { createdAt: -1 }).skip(skip).limit(limit);
 
-    if (q) {
-      query = query.select({ score: { $meta: 'textScore' } }).sort({ score: { $meta: 'textScore' } });
-    }
-
     const [books, total] = await Promise.all([
       query.exec(),
       BookModel.countDocuments(filter).exec(),
@@ -192,6 +188,23 @@ export class CatalogRepository {
     return AuthorModel.find({
       _id: { $in: authorIds },
     }).exec();
+  }
+
+  async findAuthorIdsBySearch(search: string): Promise<Types.ObjectId[]> {
+    const escapedSearch = escapeRegex(search);
+
+    if (!escapedSearch) {
+      return [];
+    }
+
+    const authors = await AuthorModel.find({
+      name: new RegExp(escapedSearch, 'i'),
+    })
+      .select({ _id: 1 })
+      .lean<Array<{ _id: Types.ObjectId }>>()
+      .exec();
+
+    return authors.map((author) => author._id);
   }
 
   async findCategoriesByIds(categoryIds: Types.ObjectId[]): Promise<CategoryDocument[]> {

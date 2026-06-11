@@ -69,6 +69,36 @@ const copyStatusClassMap: Record<CopyStatus, string> = {
   [CopyStatus.Lost]: 'bg-rose-50 text-rose-600',
 };
 
+const manuallyManagedCopyStatuses = [
+  CopyStatus.Available,
+  CopyStatus.Damaged,
+  CopyStatus.Lost,
+];
+
+function canManuallyManageCopyStatus(status: CopyStatus): boolean {
+  return manuallyManagedCopyStatuses.includes(status);
+}
+
+function getCopyStatusOptions(status: CopyStatus) {
+  const options = manuallyManagedCopyStatuses.map((copyStatus) => ({
+    label: getStatusLabel(copyStatus),
+    value: copyStatus,
+  }));
+
+  if (canManuallyManageCopyStatus(status)) {
+    return options;
+  }
+
+  return [
+    {
+      label: getStatusLabel(status),
+      value: status,
+      disabled: true,
+    },
+    ...options,
+  ];
+}
+
 function formatNumber(value: number): string {
   return new Intl.NumberFormat('vi-VN').format(value);
 }
@@ -335,17 +365,22 @@ export default function BookDetailPage() {
                                   <EyeOutlined />
                                 </button>
                               </Tooltip>
-                              <Select
-                                size="small"
-                                value={copy.status}
-                                disabled={updateCopyStatusMutation.isPending}
-                                style={{ width: 132 }}
-                                onChange={(status) => updateCopyStatusMutation.mutate({ copyId: copy._id, status })}
-                                options={Object.values(CopyStatus).map((status) => ({
-                                  label: getStatusLabel(status),
-                                  value: status,
-                                }))}
-                              />
+                              <Tooltip
+                                title={
+                                  canManuallyManageCopyStatus(copy.status)
+                                    ? 'Cập nhật tình trạng kho của bản sao'
+                                    : 'Trạng thái này được quản lý bởi khoản mượn hoặc đặt giữ'
+                                }
+                              >
+                                <Select
+                                  size="small"
+                                  value={copy.status}
+                                  disabled={!canManuallyManageCopyStatus(copy.status) || updateCopyStatusMutation.isPending}
+                                  style={{ width: 132 }}
+                                  onChange={(status) => updateCopyStatusMutation.mutate({ copyId: copy._id, status })}
+                                  options={getCopyStatusOptions(copy.status)}
+                                />
+                              </Tooltip>
                               <Tooltip title="Tác vụ khác">
                                 <button className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600" type="button">
                                   <EllipsisOutlined />

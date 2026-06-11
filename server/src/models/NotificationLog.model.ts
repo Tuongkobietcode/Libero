@@ -11,7 +11,6 @@ export interface NotificationLog {
   eventType: NotificationEvent;
   referenceId: Types.ObjectId;
   template: string;
-  recipientEmail: string;
   subject: string;
   title?: string | null;
   body?: string | null;
@@ -45,12 +44,6 @@ const notificationLogSchema = new Schema<NotificationLog, NotificationLogModelTy
       type: String,
       required: true,
       trim: true,
-    },
-    recipientEmail: {
-      type: String,
-      required: true,
-      trim: true,
-      lowercase: true,
     },
     subject: {
       type: String,

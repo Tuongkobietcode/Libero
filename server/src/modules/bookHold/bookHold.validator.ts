@@ -10,10 +10,6 @@ export const createBookHoldSchema = z.object({
   bookId: z.string().regex(objectIdPattern, 'Invalid book id'),
 });
 
-export const createBookHoldForMemberSchema = createBookHoldSchema.extend({
-  memberId: z.string().regex(objectIdPattern, 'Invalid member id'),
-});
-
 export const listBookHoldsQuerySchema = z.object({
   status: z.nativeEnum(BookHoldStatus).optional(),
   memberId: z.string().regex(objectIdPattern, 'Invalid member id').optional(),

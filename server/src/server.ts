@@ -15,38 +15,78 @@ initializeRealtime(server);
 let shuttingDown = false;
 let jobRuntime: JobRuntime | null = null;
 
-async function startServer(): Promise<void> {
-  await connectToDatabase();
+async function listenHttpServer(): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const onError = (error: Error): void => {
+      server.off('listening', onListening);
+      reject(error);
+    };
 
-  try {
-    await connectToRedis();
-    try {
-      await runOverdueFineMaintenance();
-    } catch (error: unknown) {
-      logger.warn(
-        { err: error },
-        'Initial overdue fine maintenance failed; background jobs will retry when available',
-      );
-    }
-    jobRuntime = await registerJobs();
-  } catch (error: unknown) {
-    if (env.NODE_ENV === 'production') {
-      throw error;
-    }
-
-    logger.warn(
-      { err: error },
-      'Redis unavailable; starting HTTP server without background jobs',
-    );
-    await closeRedisConnection();
-  }
-
-  await new Promise<void>((resolve) => {
-    server.listen(env.PORT, () => {
+    const onListening = (): void => {
+      server.off('error', onError);
       logger.info({ port: env.PORT, nodeEnv: env.NODE_ENV }, 'HTTP server listening');
       resolve();
-    });
+    };
+
+    server.once('error', onError);
+    server.listen(env.PORT, onListening);
   });
+}
+
+async function cleanupStartupResources(): Promise<void> {
+  disconnectRealtime();
+
+  if (server.listening) {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+
+  await jobRuntime?.close();
+  jobRuntime = null;
+  await closeJobQueues();
+  await closeDatabaseConnection();
+  await closeRedisConnection();
+}
+
+async function startServer(): Promise<void> {
+  try {
+    await connectToDatabase();
+    await listenHttpServer();
+
+    try {
+      await connectToRedis();
+      try {
+        await runOverdueFineMaintenance();
+      } catch (error: unknown) {
+        logger.warn(
+          { err: error },
+          'Initial overdue fine maintenance failed; background jobs will retry when available',
+        );
+      }
+      jobRuntime = await registerJobs();
+    } catch (error: unknown) {
+      if (env.NODE_ENV === 'production') {
+        throw error;
+      }
+
+      logger.warn(
+        { err: error },
+        'Redis unavailable; starting HTTP server without background jobs',
+      );
+      await closeRedisConnection();
+    }
+  } catch (error: unknown) {
+    await cleanupStartupResources();
+    throw error;
+  }
 }
 
 async function shutdown(signal: NodeJS.Signals): Promise<void> {

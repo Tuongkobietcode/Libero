@@ -4,7 +4,6 @@ import type { Role } from '../../common/types/enums';
 import { bookHoldService } from './bookHold.service';
 import {
   bookHoldIdParamSchema,
-  createBookHoldForMemberSchema,
   createBookHoldSchema,
   listBookHoldsQuerySchema,
 } from './bookHold.validator';
@@ -22,16 +21,6 @@ export class BookHoldController {
   async createHold(req: Request, res: Response): Promise<void> {
     const input = createBookHoldSchema.parse(req.body);
     const result = await bookHoldService.createHold(req.user?._id ?? '', input, buildActor(req));
-
-    res.status(201).json({
-      success: true,
-      data: result,
-    });
-  }
-
-  async createHoldForMember(req: Request, res: Response): Promise<void> {
-    const input = createBookHoldForMemberSchema.parse(req.body);
-    const result = await bookHoldService.createHold(input.memberId, { bookId: input.bookId }, buildActor(req));
 
     res.status(201).json({
       success: true,

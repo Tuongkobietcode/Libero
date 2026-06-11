@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 import { CopyStatus } from '../../common/types/enums';
-import type { CsvImportRow } from './catalog.types';
 
 const currentYear = new Date().getUTCFullYear() + 1;
 const objectIdPattern = /^[a-f0-9]{24}$/i;
@@ -21,10 +20,6 @@ export function normalizeIsbn(input: string): string {
 
 export function isValidIsbn(input: string): boolean {
   return /^\d{10}(\d{3})?$/.test(normalizeIsbn(input));
-}
-
-export function parseDelimitedNames(input: string): string[] {
-  return dedupe(input.split(/[|;,]/).map((value) => value.trim()));
 }
 
 const nonEmptyString = z.string().trim().min(1);
@@ -119,19 +114,3 @@ export const updateCategorySchema = z
     name: nonEmptyString.max(100).optional(),
   })
   .refine((value) => Object.values(value).some((field) => field !== undefined), 'At least one field must be provided');
-
-export const csvImportRowSchema: z.ZodType<CsvImportRow> = z.object({
-  isbn: z
-    .string()
-    .transform(normalizeIsbn)
-    .refine(isValidIsbn, 'ISBN must contain exactly 10 or 13 digits'),
-  title: nonEmptyString.max(255),
-  author: nonEmptyString,
-  category: nonEmptyString,
-  quantity: z.coerce.number().int().min(1).max(100),
-  shelfLocation: nonEmptyString.max(100),
-  publisher: optionalTrimmedStringSchema,
-  publishYear: optionalNumberSchema,
-  description: optionalTrimmedStringSchema,
-  coverImage: optionalTrimmedStringSchema,
-});

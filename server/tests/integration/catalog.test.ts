@@ -175,10 +175,6 @@ describe('Catalog Phase 4 integration', () => {
     process.env.JWT_SECRET = '0123456789abcdef0123456789abcdef';
     process.env.JWT_ACCESS_TTL = '900';
     process.env.JWT_REFRESH_TTL = '604800';
-    process.env.SMTP_HOST = 'smtp.example.com';
-    process.env.SMTP_PORT = '587';
-    process.env.SMTP_USER = 'smtp-user';
-    process.env.SMTP_PASS = 'smtp-pass';
     process.env.FINE_BLOCK_THRESHOLD = '50000';
     process.env.HOLD_EXPIRY_HOURS = '48';
     process.env.FRONTEND_URL = 'http://localhost:5173';
@@ -480,6 +476,13 @@ describe('Catalog Phase 4 integration', () => {
     expect(searchResponse.body.data.items).toHaveLength(1);
     expect(searchResponse.body.data.items[0].title).toBe('Harry Potter');
 
+    const authorSearchResponse = await request(app)
+      .get('/api/v1/books?q=Rowling')
+      .expect(200);
+
+    expect(authorSearchResponse.body.data.items).toHaveLength(1);
+    expect(authorSearchResponse.body.data.items[0].title).toBe('Harry Potter');
+
     const availableResponse = await request(app)
       .get('/api/v1/books?available=true')
       .expect(200);
@@ -544,31 +547,6 @@ describe('Catalog Phase 4 integration', () => {
 
     const totalCopies = await BookCopyModel.countDocuments({ bookId }).exec();
     expect(totalCopies).toBe(3);
-  });
-
-  it('imports CSV with per-row errors', async () => {
-    await createActiveMember({ email: 'librarian@example.com', password: 'Password1', role: Role.Librarian });
-    const accessToken = await loginAs('librarian@example.com', 'Password1');
-
-    const csv = [
-      'isbn,title,author,category,quantity,shelfLocation,publisher',
-      '9781234567890,Harry Potter,J.K. Rowling,Fantasy,2,A1,Bloomsbury',
-      '9781234567891,Domain-Driven Design,Eric Evans,Technology,1,B2,Addison-Wesley',
-      '9781234567890,Duplicate Book,Another Author,Fantasy,1,C3,Test',
-    ].join('\n');
-
-    const response = await request(app)
-      .post('/api/v1/books/import')
-      .set('Authorization', `Bearer ${accessToken}`)
-      .attach('file', Buffer.from(csv, 'utf-8'), 'books.csv')
-      .expect(200);
-
-    expect(response.body.data.successCount).toBe(2);
-    expect(response.body.data.failedCount).toBe(1);
-    expect(response.body.data.errors).toHaveLength(1);
-
-    const books = await BookModel.find().exec();
-    expect(books).toHaveLength(2);
   });
 
   it('creates a member as librarian', async () => {

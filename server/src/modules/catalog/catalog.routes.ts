@@ -8,27 +8,7 @@ import { authorize } from '../../common/middleware/authorize';
 import { Role } from '../../common/types/enums';
 import { catalogController } from './catalog.controller';
 
-const csvMimeTypes = new Set(['text/csv', 'application/vnd.ms-excel']);
 const coverMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-
-function isCsvFile(file: Express.Multer.File): boolean {
-  return csvMimeTypes.has(file.mimetype) || file.originalname.toLowerCase().endsWith('.csv');
-}
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024,
-  },
-  fileFilter: (_req, file, cb) => {
-    if (isCsvFile(file)) {
-      cb(null, true);
-      return;
-    }
-
-    cb(new BadRequestError(ERR.COMMON_BAD_REQUEST, 400, 'Only CSV files are accepted'));
-  },
-});
 
 const coverUpload = multer({
   storage: multer.memoryStorage(),
@@ -112,15 +92,5 @@ catalogRouter.post('/:id/copies', authenticate, authorize(Role.Librarian, Role.A
 catalogRouter.patch('/copies/:copyId', authenticate, authorize(Role.Librarian, Role.Admin), (req, res, next) => {
   void catalogController.updateCopyStatus(req, res).catch(next);
 });
-
-catalogRouter.post(
-  '/import',
-  authenticate,
-  authorize(Role.Librarian, Role.Admin),
-  upload.single('file'),
-  (req, res, next) => {
-    void catalogController.importBooks(req, res).catch(next);
-  },
-);
 
 export { catalogRouter };

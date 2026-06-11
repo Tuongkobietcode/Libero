@@ -11,7 +11,6 @@ import { CopyStatus, LoanStatus } from '../../common/types/enums';
 import { writeAuditLog } from '../../common/utils/auditLogger';
 import { generateBarcode } from '../../common/utils/barcodeGenerator';
 import { uniqueObjectIds } from '../../common/utils/collectionHelpers';
-import { parseCsvBuffer } from '../../common/utils/csvImporter';
 import { buildPagination, buildPaginationResult } from '../../common/utils/pagination';
 import type { AuthorDocument } from '../../models/Author.model';
 import type { BookDocument } from '../../models/Book.model';
@@ -19,7 +18,6 @@ import type { BookCopyDocument } from '../../models/BookCopy.model';
 import type { CategoryDocument } from '../../models/Category.model';
 import { reservationService } from '../reservation/reservation.service';
 import { catalogRepository, type CatalogRepository } from './catalog.repository';
-import { csvImportRowSchema, parseDelimitedNames } from './catalog.validator';
 import type {
   AddCopiesDto,
   BookCopyView,
@@ -29,16 +27,12 @@ import type {
   CategoryListItem,
   CreateBookDto,
   CreateCategoryDto,
-  CsvImportErrorDetail,
-  CsvImportResult,
   RequestActor,
   SearchBooksQuery,
   UpdateBookDto,
   UpdateCategoryDto,
   UpdateCopyStatusDto,
 } from './catalog.types';
-
-const DEFAULT_BOOK_COVER_IMAGE = 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=400&auto=format&fit=crop';
 
 type NameDocument = AuthorDocument | CategoryDocument;
 
@@ -56,6 +50,10 @@ type ReservationQueueService = Pick<typeof reservationService, 'notifyNext'>;
 
 function isDuplicateKeyError(error: unknown): error is { code: 11000 } {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 11000;
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function toNameRef(document: NameDocument): BookNameRef {
@@ -146,7 +144,20 @@ export class CatalogService {
     };
 
     if (query.q) {
-      filter.$text = { $search: query.q };
+      const searchPattern = new RegExp(escapeRegex(query.q), 'i');
+      const matchingAuthorIds = await this.repository.findAuthorIdsBySearch(query.q);
+      const searchConditions: Array<Record<string, unknown>> = [
+        { title: searchPattern },
+        { isbn: searchPattern },
+        { publisher: searchPattern },
+        { description: searchPattern },
+      ];
+
+      if (matchingAuthorIds.length > 0) {
+        searchConditions.push({ authorIds: { $in: matchingAuthorIds } });
+      }
+
+      filter.$or = searchConditions;
     }
 
     if (query.category) {
@@ -440,7 +451,14 @@ export class CatalogService {
       throw new NotFoundError(ERR.CAT_COPY_NOT_FOUND, 404, 'Book copy not found');
     }
 
-    const result = this.toCopyView(updatedCopy);
+    let copyForResult = updatedCopy;
+
+    if (input.status === CopyStatus.Available) {
+      await this.reservationQueueService.notifyNext(updatedCopy.bookId.toString(), updatedCopy.id, actor);
+      copyForResult = (await this.repository.findBookCopyById(updatedCopy.id)) ?? updatedCopy;
+    }
+
+    const result = this.toCopyView(copyForResult);
     this.writeAudit(actor, 'UPDATE_COPY_STATUS', 'BookCopy', updatedCopy.id, this.toCopyView(copy), result);
 
     return result;
@@ -573,81 +591,6 @@ export class CatalogService {
     return {
       categoryId: currentCategory.id,
       deleted: true,
-    };
-  }
-
-  async importCsv(buffer: Buffer, actor?: RequestActor): Promise<CsvImportResult> {
-    const rows = await parseCsvBuffer(buffer);
-    const errors: CsvImportErrorDetail[] = [];
-    let successCount = 0;
-    let failedCount = 0;
-    const seenIsbns = new Set<string>();
-
-    for (let startIndex = 0; startIndex < rows.length; startIndex += 50) {
-      const batch = rows.slice(startIndex, startIndex + 50);
-
-      for (let rowIndex = 0; rowIndex < batch.length; rowIndex += 1) {
-        const rowNumber = startIndex + rowIndex + 2;
-        const rawRow = batch[rowIndex];
-        const parsed = csvImportRowSchema.safeParse(rawRow);
-
-        if (!parsed.success) {
-          failedCount += 1;
-          errors.push({
-            row: rowNumber,
-            isbn: typeof rawRow.isbn === 'string' ? rawRow.isbn : undefined,
-            message: parsed.error.issues[0]?.message ?? 'Invalid CSV row',
-          });
-          continue;
-        }
-
-        const row = parsed.data;
-
-        if (seenIsbns.has(row.isbn)) {
-          failedCount += 1;
-          errors.push({
-            row: rowNumber,
-            isbn: row.isbn,
-            message: 'Duplicate ISBN in import file',
-          });
-          continue;
-        }
-
-        seenIsbns.add(row.isbn);
-
-        try {
-          await this.createBook(
-            {
-              isbn: row.isbn,
-              title: row.title,
-              authors: parseDelimitedNames(row.author),
-              categories: parseDelimitedNames(row.category),
-              publisher: row.publisher,
-              publishYear: row.publishYear,
-              description: row.description,
-              coverImage: row.coverImage ?? DEFAULT_BOOK_COVER_IMAGE,
-              quantity: row.quantity,
-              shelfLocation: row.shelfLocation,
-            },
-            actor,
-          );
-
-          successCount += 1;
-        } catch (error) {
-          failedCount += 1;
-          errors.push({
-            row: rowNumber,
-            isbn: row.isbn,
-            message: error instanceof Error ? error.message : 'Failed to import row',
-          });
-        }
-      }
-    }
-
-    return {
-      successCount,
-      failedCount,
-      errors,
     };
   }
 

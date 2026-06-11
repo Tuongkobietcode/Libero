@@ -214,18 +214,6 @@ export class CatalogController {
     });
   }
 
-  async importBooks(req: Request, res: Response): Promise<void> {
-    if (!req.file?.buffer) {
-      throw new BadRequestError(ERR.COMMON_BAD_REQUEST, 400, 'CSV file is required');
-    }
-
-    const result = await catalogService.importCsv(req.file.buffer, buildActor(req));
-
-    res.status(200).json({
-      success: true,
-      data: result,
-    });
-  }
 }
 
 export const catalogController = new CatalogController();

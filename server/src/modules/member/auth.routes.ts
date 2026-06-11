@@ -18,10 +18,12 @@ function createAuthRateLimiter(
   code: typeof ERR[keyof typeof ERR],
   message: string,
   windowMs = 15 * 60 * 1000,
+  skipSuccessfulRequests = false,
 ) {
   return rateLimit({
     windowMs,
     limit,
+    skipSuccessfulRequests,
     standardHeaders: true,
     legacyHeaders: false,
     ...(env.NODE_ENV === 'production'
@@ -43,7 +45,7 @@ function createAuthRateLimiter(
   });
 }
 
-const loginLimiter = createAuthRateLimiter('login', 10, ERR.AUTH_TOO_MANY_ATTEMPTS, 'Too many login attempts. Please try again later.');
+const loginLimiter = createAuthRateLimiter('login', 10, ERR.AUTH_TOO_MANY_ATTEMPTS, 'Too many login attempts. Please try again later.', 15 * 60 * 1000, true);
 const refreshLimiter = createAuthRateLimiter('refresh', 30, ERR.COMMON_RATE_LIMITED, 'Too many refresh attempts. Please try again later.');
 const registerLimiter = createAuthRateLimiter(
   'register',

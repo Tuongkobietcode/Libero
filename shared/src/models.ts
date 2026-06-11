@@ -163,18 +163,6 @@ export interface BookDetail extends BookListItem {
   copies: BookCopyView[];
 }
 
-export interface CsvImportErrorDetail {
-  row: number;
-  isbn?: string;
-  message: string;
-}
-
-export interface CsvImportResult {
-  successCount: number;
-  failedCount: number;
-  errors: CsvImportErrorDetail[];
-}
-
 export interface CategoryFacet {
   _id: string;
   name: string;

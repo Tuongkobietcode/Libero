@@ -1,6 +1,5 @@
 import {
   CheckCircleOutlined,
-  DollarOutlined,
   EllipsisOutlined,
   ExclamationCircleOutlined,
   ReloadOutlined,
@@ -13,7 +12,7 @@ import { Alert, Empty, Modal, Tooltip } from 'antd';
 import TextArea from 'antd/es/input/TextArea';
 import { useMemo, useState } from 'react';
 
-import { AdminSelect, primaryActionButtonClass } from '../../components/AdminSurface';
+import { AdminSelect } from '../../components/AdminSurface';
 import { fineApi } from '../../services/fine.api';
 import { memberApi } from '../../services/member.api';
 import { useNotificationsStore } from '../../store/notifications.store';
@@ -261,18 +260,6 @@ export default function FineManagerPage() {
 
   return (
     <div className="space-y-7">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
-        <button
-          type="button"
-          disabled
-          title="Khoản phạt được tạo từ nghiệp vụ trả trễ, mất sách hoặc hỏng sách."
-          className={`${primaryActionButtonClass} cursor-not-allowed opacity-60 hover:translate-y-0 hover:bg-white`}
-        >
-          <DollarOutlined />
-          Tạo khoản phạt
-        </button>
-      </div>
-
       <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
         <StatCard icon={<ExclamationCircleOutlined />} label="Chưa thanh toán" count={unpaidCountQuery.data?.pagination.totalItems} amount={summary?.unpaidTotal} tone="rose" />
         <StatCard icon={<CheckCircleOutlined />} label="Đã thanh toán" count={paidCountQuery.data?.pagination.totalItems} amount={summary?.paidTotal} tone="emerald" />
